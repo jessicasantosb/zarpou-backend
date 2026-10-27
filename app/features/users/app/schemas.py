@@ -91,22 +91,9 @@ class UserResponse(BaseModel):
         default="email",
         validation_alias=AliasChoices("twoFactorMethod", "two_factor_method")
     )
-    two_factor_secret: Optional[str] = Field(
-        default=None,
-        validation_alias=AliasChoices("two_factor_secret", "twoFactorSecret")
-    )
-    twoFactorSecret: Optional[str] = Field(
-        default=None,
-        validation_alias=AliasChoices("twoFactorSecret", "two_factor_secret")
-    )
-    backup_codes: Optional[List[str]] = Field(
-        default_factory=list,
-        validation_alias=AliasChoices("backup_codes", "backupCodes", "two_factor_backup_codes")
-    )
-    backupCodes: Optional[List[str]] = Field(
-        default_factory=list,
-        validation_alias=AliasChoices("backupCodes", "backup_codes", "two_factor_backup_codes")
-    )
+    # Campos twoFactorSecret/two_factor_secret/backupCodes foram removidos da
+    # resposta (OWASP A07): vazavam o segredo TOTP e os códigos de recuperação de
+    # TODOS os administradores para qualquer operador com a tela 'administradores'.
     allowed_screens: List[str] = Field(
         default_factory=list,
         validation_alias=AliasChoices("allowed_screens", "allowedScreens")

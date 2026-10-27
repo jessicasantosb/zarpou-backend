@@ -363,10 +363,17 @@ def test_08_ai_concierge_chat():
     res_f = chat_f.json()
     assert "Miami" in res_f["reply"]
 
-    # Histórico de Chat da Sessão
-    hist_res = client.get(f"/api/v1/chat/history?sessionId={session_id}")
+    # Histórico de Chat exige autenticação do titular (LGPD / IDOR)
+    hist_anon = client.get(f"/api/v1/chat/history?sessionId={session_id}")
+    assert hist_anon.status_code == 401
+
+    # Cliente logado consulta o próprio histórico (sessão anônima não pertence a ele -> vazio)
+    cust_login = client.post(
+        "/api/v1/auth/customer/login",
+        json={"email": "mariana.souza@exemplo.com", "password": "senhaSegura123"},
+    )
+    assert cust_login.status_code == 200
+    cust_headers = {"Authorization": f"Bearer {cust_login.json()['access_token']}"}
+    hist_res = client.get(f"/api/v1/chat/history?sessionId={session_id}", headers=cust_headers)
     assert hist_res.status_code == 200
-    logs = hist_res.json()
-    assert len(logs) >= 4  # 2 perguntas + 2 respostas
-    assert any(log["role"] == "user" for log in logs)
-    assert any(log["role"] == "assistant" for log in logs)
+    assert hist_res.json() == []

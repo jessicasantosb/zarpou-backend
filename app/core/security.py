@@ -33,6 +33,7 @@ def create_access_token(
     
     to_encode = {
         "exp": expire,
+        "iat": int(datetime.now(timezone.utc).timestamp()),
         "sub": str(subject),
         "role": role,
         "type": "access",
@@ -70,6 +71,7 @@ def create_refresh_token(
 
     to_encode = {
         "exp": expire,
+        "iat": int(datetime.now(timezone.utc).timestamp()),
         "sub": str(subject),
         "role": role,
         "type": "refresh",

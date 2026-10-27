@@ -17,6 +17,9 @@ class ChatService:
     def get_history(self, session_id: str) -> List[ChatLog]:
         return self.repo.get_history(session_id)
 
+    def get_customer_history(self, customer_id: str, session_id: Optional[str] = None) -> List[ChatLog]:
+        return self.repo.get_customer_history(customer_id, session_id=session_id)
+
     async def chat(self, req: ChatRequest, customer_id: Optional[str]) -> ChatResponse:
         agency_cfg = self.db.query(AgencySetting).filter(AgencySetting.id == "default").first()
         wa_num = (agency_cfg.phone if agency_cfg and agency_cfg.phone else "31984210000").replace("+", "").replace("-", "").replace(" ", "").replace("(", "").replace(")", "")

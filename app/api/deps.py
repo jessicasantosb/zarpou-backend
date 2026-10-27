@@ -19,7 +19,12 @@ def get_current_user_payload(
     if not token:
         return None
     payload = decode_access_token(token)
-    if payload and is_token_revoked(db, payload.get("jti")):
+    if payload and is_token_revoked(
+        db,
+        payload.get("jti"),
+        subject=payload.get("sub"),
+        issued_at=payload.get("iat"),
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Sessão encerrada. Faça login novamente.",

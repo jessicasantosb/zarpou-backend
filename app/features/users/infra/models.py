@@ -9,6 +9,7 @@ ALL_ADMIN_SCREENS = [
     "dashboard",
     "hero",
     "promocoes",
+    "cupons",
     "hospedagens",
     "passagens",
     "destinos",
@@ -31,7 +32,7 @@ class User(Base):
     is_active = Column(Boolean, nullable=False, default=True)
     two_factor_enabled = Column(Boolean, nullable=False, default=False)
     two_factor_method = Column(String(20), nullable=True, default="email")
-    two_factor_secret = Column(String(64), nullable=True)
+    two_factor_secret = Column(String(255), nullable=True)  # cifrado em repouso (Fernet, prefixo 'enc:')
     two_factor_backup_codes = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
@@ -50,7 +51,10 @@ class User(Base):
 
     @property
     def twoFactorSecret(self) -> Optional[str]:
-        return self.two_factor_secret
+        # Decifra em memória (o valor no banco pode estar cifrado com Fernet,
+        # prefixo 'enc:'); valores legados em texto puro são retornados como estão.
+        from app.core.two_factor import decrypt_totp_secret
+        return decrypt_totp_secret(self.two_factor_secret)
 
     @property
     def backupCodes(self) -> List[str]:

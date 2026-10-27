@@ -11,7 +11,12 @@ def test_2fa_full_lifecycle():
     # 1. Registrar / Logar cliente com email idempotente
     email = f"cliente.2fa.{int(time.time())}@exemplo.com"
     pwd = "minhaSenhaSegura123"
-    
+    reg_res = client.post(
+        "/api/v1/auth/customer/register",
+        json={"name": "Cliente 2FA", "email": email, "password": pwd},
+    )
+    assert reg_res.status_code in (201, 400)  # 400 = já cadastrado em execução anterior
+
     login_res = client.post("/api/v1/auth/customer/login", json={"email": email, "password": pwd})
     assert login_res.status_code == 200
     token = login_res.json()["access_token"]
@@ -79,7 +84,11 @@ def test_2fa_full_lifecycle():
         headers=headers,
     )
     assert send_code_res.status_code == 200
-    assert send_code_res.json()["success"] is True
+    send_code_body = send_code_res.json()
+    assert send_code_body["success"] is True
+    # Regressão de segurança: o código gerado jamais pode ecoar na resposta
+    # (o cliente só deve recebê-lo pelo e-mail).
+    assert "code" not in send_code_body
 
     # 8. Alteração de senha do cliente
     change_pwd_res = client.post(

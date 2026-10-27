@@ -24,6 +24,8 @@ from app.features.auth.app.schemas import (
     Customer2FaVerify,
     Customer2FaSendCode,
     CustomerChangePassword,
+    CustomerForgotPassword,
+    CustomerResetPassword,
 )
 from app.features.customers.app.schemas import CustomerCreate, CustomerResponse
 from app.features.auth.app.services import AuthService
@@ -131,8 +133,7 @@ def read_current_user(
         "two_factor_enabled": admin.twoFactorEnabled,
         "twoFactorMethod": admin.twoFactorMethod,
         "two_factor_method": admin.twoFactorMethod,
-        "twoFactorSecret": admin.twoFactorSecret,
-        "backupCodes": admin.backupCodes,
+        # Segredo TOTP e códigos de backup não são expostos aqui (OWASP A07).
     }
 
 
@@ -144,8 +145,11 @@ def update_admin_2fa(
 ) -> Any:
     """
     Atualiza as configurações de 2FA do administrador logado.
+    O segredo TOTP é cifrado em repouso (Fernet) e nunca devolvido na resposta.
     """
     import json
+    from app.core.two_factor import encrypt_totp_secret
+
     enabled = payload.get("enabled", False)
     method = payload.get("method")
     secret = payload.get("secret")
@@ -155,7 +159,7 @@ def update_admin_2fa(
     if method:
         admin.two_factor_method = method
     if secret:
-        admin.two_factor_secret = secret
+        admin.two_factor_secret = encrypt_totp_secret(secret)
     if backup_codes:
         admin.two_factor_backup_codes = json.dumps(backup_codes) if isinstance(backup_codes, list) else str(backup_codes)
     elif not enabled:
@@ -168,8 +172,6 @@ def update_admin_2fa(
         "success": True,
         "twoFactorEnabled": admin.twoFactorEnabled,
         "twoFactorMethod": admin.twoFactorMethod,
-        "twoFactorSecret": admin.twoFactorSecret,
-        "backupCodes": admin.backupCodes,
     }
 
 
@@ -252,3 +254,34 @@ def change_customer_password(
     """
     service = AuthService(db)
     return service.change_password(customer, pwd_data)
+
+
+@router.post("/customer/password/forgot")
+@limiter.limit("5/hour")
+def forgot_customer_password(
+    request: Request,
+    payload: CustomerForgotPassword,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+) -> Any:
+    """
+    Solicita link de recuperação de senha por e-mail.
+    A resposta é idêntica exista ou não a conta (evita enumeração de e-mails).
+    O link é de uso único e expira em 30 minutos.
+    """
+    service = AuthService(db)
+    return service.forgot_password(payload.email, background_tasks)
+
+
+@router.post("/customer/password/reset")
+@limiter.limit("10/hour")
+def reset_customer_password(
+    request: Request,
+    payload: CustomerResetPassword,
+    db: Session = Depends(get_db),
+) -> Any:
+    """
+    Redefine a senha do cliente usando o token recebido por e-mail (uso único, 30 min).
+    """
+    service = AuthService(db)
+    return service.reset_password(payload.token, payload.password)

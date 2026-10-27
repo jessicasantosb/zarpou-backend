@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from typing import Optional
 from app.features.agency.infra.repositories import SqlAlchemyAgencyRepository
 from app.features.agency.app.schemas import (
     AgencySettingSchema,
@@ -15,6 +16,20 @@ from app.models.flight import Flight
 from app.models.booking import Booking
 from app.models.promotion import Promotion
 from app.models.inquiry import ContactInquiry
+
+# Máscara retornada no lugar de credenciais sensíveis (chaves de API, tokens e secrets).
+# O valor real nunca sai do banco; se o painel reenviar a máscara no PUT, o segredo armazenado é preservado.
+SECRET_MASK = "••••••••"
+
+
+def _mask_secret(value) -> str:
+    """Retorna a máscara quando o segredo existe; string vazia quando não configurado."""
+    return SECRET_MASK if value else ""
+
+
+def _keep_secret(new_value: Optional[str], current_value: Optional[str]) -> Optional[str]:
+    """Preserva o valor armazenado quando o cliente reenvia a máscara sem alterações."""
+    return current_value if new_value == SECRET_MASK else new_value
 
 
 class AgencyService:
@@ -38,11 +53,11 @@ class AgencyService:
             address=setting.address or "Belo Horizonte - MG, Brasil",
             termsAndConditions=setting.terms_and_conditions,
             privacyPolicy=setting.privacy_policy,
-            resendApiKey=setting.resend_api_key or "",
+            resendApiKey=_mask_secret(setting.resend_api_key),
             whatsappApi=WhatsAppApiConfigSchema(
                 provider=setting.whatsapp_api_provider or "meta_cloud",
                 enabled=bool(setting.whatsapp_api_enabled),
-                apiToken=setting.whatsapp_api_token or "",
+                apiToken=_mask_secret(setting.whatsapp_api_token),
                 phoneNumberId=setting.whatsapp_phone_number_id or "",
                 businessAccountId=setting.whatsapp_business_account_id or "",
                 apiUrl=setting.whatsapp_api_url or "https://graph.facebook.com/v19.0",
@@ -51,9 +66,9 @@ class AgencyService:
                 provider=setting.payment_gateway_provider or "mercadopago",
                 environment=setting.payment_environment or "sandbox",
                 publicKey=setting.payment_public_key or "",
-                secretKey=setting.payment_secret_key or "",
+                secretKey=_mask_secret(setting.payment_secret_key),
                 pixKey=setting.payment_pix_key or "",
-                webhookSecret=setting.payment_webhook_secret or "",
+                webhookSecret=_mask_secret(setting.payment_webhook_secret),
                 activeMethods=PaymentActiveMethodsSchema(
                     creditCard=bool(setting.payment_active_credit_card),
                     pix=bool(setting.payment_active_pix),
@@ -63,7 +78,7 @@ class AgencyService:
             aiChat=AiChatConfigSchema(
                 enabled=bool(setting.ai_chat_enabled),
                 provider=setting.ai_chat_provider or "openai",
-                apiKey=setting.ai_chat_api_key or "",
+                apiKey=_mask_secret(setting.ai_chat_api_key),
                 model=setting.ai_chat_model or "gpt-4o-mini",
                 systemPrompt=setting.ai_chat_system_prompt or "Você é o Concierge Virtual da Zarpou Viagens e Turismo.",
                 welcomeMessage=setting.ai_chat_welcome_message or "Olá! 👋 Sou o Concierge Virtual da Zarpou Viagens. Como posso ajudar com sua próxima viagem hoje?",
@@ -73,8 +88,8 @@ class AgencyService:
                 enabled=bool(setting.storage_enabled),
                 bucketName=setting.storage_bucket_name or "",
                 region=setting.storage_region or "sa-east-1",
-                accessKeyId=setting.storage_access_key_id or "",
-                secretAccessKey=setting.storage_secret_access_key or "",
+                accessKeyId=_mask_secret(setting.storage_access_key_id),
+                secretAccessKey=_mask_secret(setting.storage_secret_access_key),
                 endpointUrl=setting.storage_endpoint_url or "",
                 publicUrlPrefix=setting.storage_public_url_prefix or "",
             ),
@@ -96,10 +111,10 @@ class AgencyService:
         setting.terms_and_conditions = data.termsAndConditions
         setting.privacy_policy = data.privacyPolicy
 
-        setting.resend_api_key = data.resendApiKey
+        setting.resend_api_key = _keep_secret(data.resendApiKey, setting.resend_api_key)
         setting.whatsapp_api_provider = data.whatsappApi.provider
         setting.whatsapp_api_enabled = data.whatsappApi.enabled
-        setting.whatsapp_api_token = data.whatsappApi.apiToken
+        setting.whatsapp_api_token = _keep_secret(data.whatsappApi.apiToken, setting.whatsapp_api_token)
         setting.whatsapp_phone_number_id = data.whatsappApi.phoneNumberId
         setting.whatsapp_business_account_id = data.whatsappApi.businessAccountId
         setting.whatsapp_api_url = data.whatsappApi.apiUrl
@@ -107,16 +122,16 @@ class AgencyService:
         setting.payment_gateway_provider = data.paymentGateway.provider
         setting.payment_environment = data.paymentGateway.environment
         setting.payment_public_key = data.paymentGateway.publicKey
-        setting.payment_secret_key = data.paymentGateway.secretKey
+        setting.payment_secret_key = _keep_secret(data.paymentGateway.secretKey, setting.payment_secret_key)
         setting.payment_pix_key = data.paymentGateway.pixKey
-        setting.payment_webhook_secret = data.paymentGateway.webhookSecret
+        setting.payment_webhook_secret = _keep_secret(data.paymentGateway.webhookSecret, setting.payment_webhook_secret)
         setting.payment_active_credit_card = data.paymentGateway.activeMethods.creditCard
         setting.payment_active_pix = data.paymentGateway.activeMethods.pix
         setting.payment_active_boleto = data.paymentGateway.activeMethods.boleto
 
         setting.ai_chat_enabled = data.aiChat.enabled
         setting.ai_chat_provider = data.aiChat.provider
-        setting.ai_chat_api_key = data.aiChat.apiKey
+        setting.ai_chat_api_key = _keep_secret(data.aiChat.apiKey, setting.ai_chat_api_key)
         setting.ai_chat_model = data.aiChat.model
         setting.ai_chat_system_prompt = data.aiChat.systemPrompt
         setting.ai_chat_welcome_message = data.aiChat.welcomeMessage
@@ -125,8 +140,8 @@ class AgencyService:
         setting.storage_enabled = data.storageBucket.enabled
         setting.storage_bucket_name = data.storageBucket.bucketName
         setting.storage_region = data.storageBucket.region
-        setting.storage_access_key_id = data.storageBucket.accessKeyId
-        setting.storage_secret_access_key = data.storageBucket.secretAccessKey
+        setting.storage_access_key_id = _keep_secret(data.storageBucket.accessKeyId, setting.storage_access_key_id)
+        setting.storage_secret_access_key = _keep_secret(data.storageBucket.secretAccessKey, setting.storage_secret_access_key)
         setting.storage_endpoint_url = data.storageBucket.endpointUrl
         setting.storage_public_url_prefix = data.storageBucket.publicUrlPrefix
 

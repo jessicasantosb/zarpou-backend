@@ -16,6 +16,18 @@ class ChatLogRepository:
             .all()
         )
 
+    def get_customer_history(
+        self,
+        customer_id: str,
+        session_id: Optional[str] = None,
+        limit: int = 60,
+    ) -> List[ChatLog]:
+        """Histórico restrito às conversas do próprio cliente (proteção IDOR/LGPD)."""
+        query = self.db.query(ChatLog).filter(ChatLog.customer_id == customer_id)
+        if session_id:
+            query = query.filter(ChatLog.session_id == session_id)
+        return query.order_by(ChatLog.created_at.asc()).limit(limit).all()
+
     def save_messages(self, session_id: str, customer_id: Optional[str], user_msg: str, bot_reply: str) -> None:
         try:
             user_log = ChatLog(session_id=session_id, customer_id=customer_id, role="user", content=user_msg)

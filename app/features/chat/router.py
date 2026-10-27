@@ -1,7 +1,7 @@
-from typing import Any, List
+from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
-from app.api.deps import get_db, get_optional_customer_user
+from app.api.deps import get_db, get_optional_customer_user, get_current_customer_user
 from app.core.limiter import limiter
 from app.features.customers.infra.models import Customer
 from app.features.chat.app.schemas import ChatRequest, ChatResponse, ChatLogResponse
@@ -12,12 +12,16 @@ router = APIRouter()
 
 @router.get("/history", response_model=List[ChatLogResponse])
 def get_chat_history(
-    sessionId: str = Query("default-session", description="Identificador da sessão do chat"),
+    sessionId: Optional[str] = Query(None, description="Identificador da sessão do chat"),
     db: Session = Depends(get_db),
+    customer: Customer = Depends(get_current_customer_user),
 ) -> Any:
-    """Retorna o histórico de mensagens de uma sessão específica."""
+    """
+    Retorna o histórico de mensagens das sessões do cliente autenticado (LGPD).
+    Cada cliente acessa apenas as conversas vinculadas à própria conta.
+    """
     service = ChatService(db)
-    return service.get_history(sessionId)
+    return service.get_customer_history(customer.id, session_id=sessionId)
 
 
 @router.post("", response_model=ChatResponse)

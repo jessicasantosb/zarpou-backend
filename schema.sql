@@ -332,6 +332,31 @@ CREATE TABLE IF NOT EXISTS promotions (
 CREATE INDEX IF NOT EXISTS idx_promotions_active ON promotions(active, display_order);
 
 -- ------------------------------------------------------------------------------
+-- 13b. TABELA DE CUPONS DE DESCONTO (Migração: 2026-10-17)
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS coupons (
+    id VARCHAR(50) PRIMARY KEY,
+    code VARCHAR(50) NOT NULL UNIQUE, -- ex: 'ZARPOU10'
+    description TEXT,
+    discount_type VARCHAR(20) NOT NULL DEFAULT 'percent', -- 'percent' | 'fixed'
+    discount_value NUMERIC(10, 2) NOT NULL, -- % ou valor em R$
+    min_order_amount NUMERIC(10, 2), -- valor mínimo do pedido para aplicar o cupom
+    max_uses INT, -- NULL = usos ilimitados
+    used_count INT NOT NULL DEFAULT 0,
+    per_customer_limit INT NOT NULL DEFAULT 1, -- usos permitidos por cliente
+    valid_from DATE,
+    valid_to DATE,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_by VARCHAR(36), -- id do admin que criou o cupom
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_coupons_code ON coupons(code);
+CREATE INDEX IF NOT EXISTS idx_coupons_active ON coupons(active);
+
+
+-- ------------------------------------------------------------------------------
 -- 14. TABELA DE ITENS ADICIONAIS DE RESERVA (Add-ons)
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS addons (
@@ -693,4 +718,19 @@ CREATE TABLE IF NOT EXISTS revoked_tokens (
 );
 
 CREATE INDEX IF NOT EXISTS idx_revoked_tokens_expires_at ON revoked_tokens(expires_at);
+
+-- ------------------------------------------------------------------------------
+-- 9. TABELA DE TOKENS DE RECUPERAÇÃO DE SENHA (fluxo por e-mail, uso único)
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS customer_password_reset_tokens (
+    id VARCHAR(36) PRIMARY KEY,
+    customer_id VARCHAR(36) NOT NULL,
+    token_hash VARCHAR(64) NOT NULL UNIQUE, -- SHA-256 do token (nunca o token em texto puro)
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    used_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_customer_password_reset_tokens_customer_id ON customer_password_reset_tokens(customer_id);
+CREATE INDEX IF NOT EXISTS idx_customer_password_reset_tokens_token_hash ON customer_password_reset_tokens(token_hash);
 

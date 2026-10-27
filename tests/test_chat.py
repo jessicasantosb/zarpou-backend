@@ -1,3 +1,4 @@
+import time
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
@@ -62,8 +63,41 @@ def test_chat_package_destinos_actions():
 
 
 def test_chat_history_endpoint():
-    response = client.get("/api/v1/chat/history?sessionId=test-session-chat")
+    # Acesso anônimo ao histórico é negado (LGPD / IDOR)
+    res_anon = client.get("/api/v1/chat/history?sessionId=test-session-chat")
+    assert res_anon.status_code == 401
+
+    # Cliente autenticado conversa e lê apenas o próprio histórico
+    # (login exige cadastro prévio — idempotente para o banco compartilhado)
+    reg = client.post(
+        "/api/v1/auth/customer/register",
+        json={"name": "Mariana Souza", "email": "mariana.souza@exemplo.com", "password": "senhaSegura123"},
+    )
+    assert reg.status_code in (201, 400)
+    login = client.post(
+        "/api/v1/auth/customer/login",
+        json={"email": "mariana.souza@exemplo.com", "password": "senhaSegura123"},
+    )
+    assert login.status_code == 200, login.text
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    session_id = f"test-session-customer-{int(time.time())}"
+    post_res = client.post(
+        "/api/v1/chat",
+        headers=headers,
+        json={"message": "Quais os melhores hotéis?", "sessionId": session_id},
+    )
+    assert post_res.status_code == 200
+
+    response = client.get(f"/api/v1/chat/history?sessionId={session_id}", headers=headers)
     assert response.status_code == 200
     logs = response.json()
     assert isinstance(logs, list)
     assert len(logs) >= 2
+    assert any(log["role"] == "user" for log in logs)
+    assert any(log["role"] == "assistant" for log in logs)
+
+    # Sessão usada anonimamente não pertence à cliente logada -> vazio (sem IDOR)
+    res_other = client.get("/api/v1/chat/history?sessionId=test-session-chat", headers=headers)
+    assert res_other.status_code == 200
+    assert res_other.json() == []

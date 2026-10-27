@@ -108,4 +108,20 @@ class Customer(Base):
         return self.two_factor_confirmed_at.isoformat() if self.two_factor_confirmed_at else None
 
 
+class CustomerPasswordResetToken(Base):
+    """
+    Tokens de recuperação de senha por e-mail (uso único, expiração curta).
+    Armazenamos APENAS o hash SHA-256 do token — um vazamento do banco não
+    expõe links de redefinição válidos.
+    """
+    __tablename__ = "customer_password_reset_tokens"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    customer_id = Column(String(36), nullable=False, index=True)
+    token_hash = Column(String(64), nullable=False, unique=True, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
 CustomerModel = Customer

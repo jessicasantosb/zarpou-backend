@@ -17,6 +17,7 @@ from app.features.bookings.app.schemas import (
     BookingStatusUpdate,
     PriceSummarySchema,
 )
+from app.features.coupons.app.services import CouponService
 
 
 class BookingService:
@@ -74,6 +75,7 @@ class BookingService:
             "installments": b.installments,
             "companyId": b.company_id,
             "costCenter": b.cost_center,
+            "couponCode": b.coupon_code,
             "pricing": pricing,
             "pixCode": b.pix_code,
             "pixQrCodeUrl": b.pix_qr_code_url,
@@ -152,7 +154,9 @@ class BookingService:
         discount_amount = 0.0
         status_initial = "pendente_pagamento" if booking_in.paymentMethod in ["pix", "boleto"] else "confirmada"
         company_id = None
+        primary_traveler = next((t for t in booking_in.travelers if t.isPrimary), booking_in.travelers[0])
 
+        target_company = None
         if booking_in.paymentMethod == "corporate_invoice":
             comp_id = booking_in.companyId or (company.id if company else None)
             if not comp_id:
@@ -169,8 +173,28 @@ class BookingService:
 
             disc_pct = float(target_company.corporate_discount_percent or 0.0)
             discount_amount = round(base_amount * (disc_pct / 100.0), 2)
-            final_amount = round(base_amount + taxes_and_fees + addons_amount - discount_amount, 2)
+            status_initial = "confirmada"
+            company_id = target_company.id
 
+        elif booking_in.paymentMethod == "pix":
+            discount_amount = round((base_amount + taxes_and_fees) * 0.05, 2)
+
+        final_amount = round(base_amount + taxes_and_fees + addons_amount - discount_amount, 2)
+
+        # Cupom de desconto (validado aqui; o uso é registrado na mesma transação da reserva)
+        coupon_code = (booking_in.couponCode or "").strip().upper() or None
+        if coupon_code:
+            coupon, coupon_discount = CouponService(self.db).validate_for_checkout(
+                code=coupon_code,
+                order_amount=final_amount,
+                customer_email=str(primary_traveler.email or ""),
+            )
+            if coupon_discount > 0:
+                discount_amount = round(discount_amount + coupon_discount, 2)
+                final_amount = round(final_amount - coupon_discount, 2)
+                coupon.used_count = int(coupon.used_count or 0) + 1
+
+        if target_company is not None:
             if target_company.credit_available < final_amount:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -178,14 +202,6 @@ class BookingService:
                 )
 
             target_company.credit_used = float(target_company.credit_used or 0.0) + final_amount
-            status_initial = "confirmada"
-            company_id = target_company.id
-
-        elif booking_in.paymentMethod == "pix":
-            discount_amount = round((base_amount + taxes_and_fees) * 0.05, 2)
-            final_amount = round(base_amount + taxes_and_fees + addons_amount - discount_amount, 2)
-        else:
-            final_amount = round(base_amount + taxes_and_fees + addons_amount, 2)
 
         pix_code = None
         pix_expires_at = None
@@ -193,7 +209,6 @@ class BookingService:
             pix_code = f"00020126580014br.gov.bcb.pix0136{locator_code}-zarpou-pagamentos520400005303986540{final_amount:.2f}5802BR5922Zarpou Viagens Ltda6014Belo Horizonte62070503***6304"
             pix_expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
 
-        primary_traveler = next((t for t in booking_in.travelers if t.isPrimary), booking_in.travelers[0])
         customer_id = customer.id if customer else None
 
         if not customer_id and not company_id:
@@ -236,6 +251,7 @@ class BookingService:
             addons_amount=addons_amount,
             discount_amount=discount_amount,
             final_amount=final_amount,
+            coupon_code=coupon_code,
             pix_code=pix_code,
             pix_expires_at=pix_expires_at,
             voucher_url=f"/reserva/confirmada/{booking_id}",

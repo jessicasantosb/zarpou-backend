@@ -7,6 +7,7 @@ from app.features.hotels.router import router as hotels_router
 from app.features.flights.router import router as flights_router
 from app.features.packages.router import router as packages_router
 from app.features.promotions.router import router as promotions_router
+from app.features.coupons.router import router as coupons_router
 from app.features.addons.router import router as addons_router
 from app.features.bookings.router import router as bookings_router
 from app.features.inquiries.router import router as inquiries_router
@@ -14,6 +15,7 @@ from app.features.agency.router import router as agency_router
 from app.features.chat.router import router as chat_router
 from app.features.companies.router import router as companies_router
 from app.features.storage.router import router as storage_router
+from app.features.imports.router import router as imports_router
 
 api_router = APIRouter()
 
@@ -25,6 +27,7 @@ api_router.include_router(hotels_router, prefix="/hotels", tags=["Hotéis & Hosp
 api_router.include_router(flights_router, prefix="/flights", tags=["Passagens Aéreas"])
 api_router.include_router(packages_router, prefix="/packages", tags=["Pacotes Turísticos"])
 api_router.include_router(promotions_router, prefix="/promotions", tags=["Promoções"])
+api_router.include_router(coupons_router, prefix="/coupons", tags=["Cupons de Desconto"])
 api_router.include_router(addons_router, prefix="/addons", tags=["Adicionais & Serviços"])
 api_router.include_router(bookings_router, prefix="/bookings", tags=["Reservas & Vouchers"])
 api_router.include_router(inquiries_router, prefix="/inquiries", tags=["Consultoria & Contato"])
@@ -32,4 +35,5 @@ api_router.include_router(agency_router, prefix="/agency", tags=["Configuraçõe
 api_router.include_router(chat_router, prefix="/chat", tags=["Concierge Virtual (IA)"])
 api_router.include_router(companies_router, prefix="/companies", tags=["Zarpou Empresas (B2B)"])
 api_router.include_router(storage_router, prefix="/storage", tags=["Armazenamento & Uploads"])
+api_router.include_router(imports_router, prefix="/imports", tags=["Importação em Massa"])
 

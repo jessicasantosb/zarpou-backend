@@ -1,5 +1,7 @@
 from datetime import datetime, timezone, timedelta
+import hashlib
 import json
+import secrets
 import uuid
 from typing import Any, Optional, Dict
 from fastapi import HTTPException, status, BackgroundTasks
@@ -24,7 +26,7 @@ from app.core.two_factor import (
 )
 import hmac
 from app.models.user import User
-from app.models.customer import Customer
+from app.models.customer import Customer, CustomerPasswordResetToken
 from app.features.auth.app.schemas import (
     LoginRequest,
     CustomerLoginRequest,
@@ -84,6 +86,56 @@ def send_welcome_email_task(name: str, email: str) -> None:
         print("[Backend Resend Error]", exc)
 
 
+def send_password_reset_email(name: str, email: str, reset_url: str) -> None:
+    """
+    Envia o e-mail com o link de recuperação de senha (Resend).
+    Sem chave configurada (dev), simula imprimindo o link no console.
+    """
+    api_key = settings.RESEND_API_KEY
+    if not api_key:
+        print(f"[RECUPERAÇÃO DE SENHA - DEV SIMULATION] Link para {email}: {reset_url}")
+        return
+    try:
+        first_name = name.split()[0] if name else "Viajante"
+        html_content = f"""
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff;">
+          <div style="background-color: #003366; padding: 25px; text-align: center; border-radius: 14px;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Zarpou Viagens e Turismo</h1>
+            <p style="color: #f7a01d; margin: 6px 0 0 0; font-size: 13px; font-weight: bold; text-transform: uppercase;">Recuperação de Senha</p>
+          </div>
+          <div style="padding: 30px 20px; color: #334155; line-height: 1.6;">
+            <p style="font-size: 15px;">Olá, <strong>{first_name}</strong>!</p>
+            <p style="font-size: 14px; color: #64748b;">Recebemos uma solicitação para redefinir a senha da sua conta Zarpou (e-mail: <strong>{email}</strong>). Para criar uma nova senha, clique no botão abaixo:</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="{reset_url}" style="background-color: #003366; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 12px; font-weight: bold; display: inline-block;">Redefinir minha senha →</a>
+            </div>
+            <p style="font-size: 12px; color: #64748b;">Este link é de uso único e válido por <strong>30 minutos</strong>. Se você não solicitou esta alteração, ignore este e-mail — sua senha permanecerá a mesma.</p>
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
+            <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">
+              Zarpou Viagens e Turismo Ltda • Cadastur: 34.120.948/0001-90<br />
+              Mensagem automática enviada pelo sistema de segurança Zarpou.
+            </p>
+          </div>
+        </div>
+        """
+        with httpx.Client(timeout=10.0) as client:
+            client.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "from": "Zarpou Viagens <lazer@zarpouviagens.com.br>",
+                    "to": [email],
+                    "subject": "🔒 Redefina sua senha da Zarpou Viagens",
+                    "html": html_content,
+                },
+            )
+    except Exception as exc:
+        print("[Backend Resend Error]", exc)
+
+
 class AuthService:
     def __init__(self, db: Session):
         self.db = db
@@ -135,8 +187,8 @@ class AuthService:
                 "two_factor_enabled": user.twoFactorEnabled,
                 "twoFactorMethod": user.twoFactorMethod,
                 "two_factor_method": user.twoFactorMethod,
-                "twoFactorSecret": user.twoFactorSecret,
-                "backupCodes": user.backupCodes,
+                # Segredo TOTP e códigos de backup NUNCA são devolvidos (vazavam em texto
+                # claro na resposta de login — um token roubado daria bypass permanente do 2FA).
             }
         }
 
@@ -147,35 +199,48 @@ class AuthService:
     ) -> Dict[str, Any]:
         email_clean = login_data.email.strip().lower()
 
-        # Bloqueia contas administrativas de serem cadastradas/logadas na área de clientes
+        # Bloqueia contas administrativas de serem cadastradas/logadas na área de clientes.
+        # Mensagem genérica (idêntica à de senha incorreta): um erro específico confirmaria
+        # que o e-mail pertence a um admin — enumeração de contas privilegiadas.
         is_admin = self.db.query(User).filter(User.email == email_clean).first()
         if is_admin:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Este e-mail pertence a um administrador da agência. Por favor, acesse através do Painel Administrativo (/admin/login)."
+                detail="E-mail ou senha incorretos."
             )
 
         customer = self.db.query(Customer).filter(Customer.email == email_clean).first()
 
+        # LOGIN SEM SENHA É PROIBIDO (OWASP A07): a senha é obrigatória no schema e
+        # sempre é verificada abaixo — inclusive em contas legadas sem senha definida.
+        #
+        # A auto-criação de conta no login foi REMOVIDA (SECURITY_BACKLOG #1):
+        # e-mail desconhecido retornava 200 e criava conta sem os consentimentos
+        # LGPD exigidos no registro — e, como a resposta passava a ser 400 só
+        # para e-mails existentes, o login virava oráculo de enumeração. Agora
+        # exige-se cadastro prévio e a resposta para e-mail desconhecido é
+        # idêntica à de senha incorreta (anti-enumeração).
         if not customer:
-            name_from_email = email_clean.split("@")[0].capitalize()
-            customer = Customer(
-                id=f"cust-{int(datetime.now(timezone.utc).timestamp())}",
-                name=name_from_email,
-                email=email_clean,
-                is_active=True
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="E-mail ou senha incorretos.",
             )
-            if login_data.password:
-                customer.password_hash = get_password_hash(login_data.password)
-            self.db.add(customer)
-            self.db.commit()
-            self.db.refresh(customer)
-        elif login_data.password and customer.password_hash:
-            if not verify_password(login_data.password, customer.password_hash):
+        if not customer.password_hash:
+            # Conta legada criada sem senha pelo bug antigo de login sem senha.
+            # Define a senha no primeiro acesso autenticado — a partir daqui toda
+            # conta passa a exigir senha para entrar.
+            if len(login_data.password.strip()) < 6:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Senha incorreta."
+                    detail="A senha deve ter no mínimo 6 caracteres.",
                 )
+            customer.password_hash = get_password_hash(login_data.password)
+            self.db.commit()
+        elif not verify_password(login_data.password, customer.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="E-mail ou senha incorretos."
+            )
 
         # Se o cliente possui 2FA ativado e o método é email ou both, gera o PIN e dispara email
         if customer.two_factor_enabled and customer.two_factor_method in ["email", "both"]:
@@ -226,16 +291,18 @@ class AuthService:
 
         is_admin = self.db.query(User).filter(User.email == email_clean).first()
         if is_admin:
+            # Mesma mensagem do caso de e-mail duplicado abaixo: não distingue
+            # admin de cliente para não confirmar contas privilegiadas (enumeração).
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Este e-mail pertence a um administrador da agência. Cadastros de clientes devem utilizar e-mails pessoais."
+                detail="Já existe uma conta com este e-mail. Tente fazer login."
             )
 
         existing = self.db.query(Customer).filter(Customer.email == email_clean).first()
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Já existe um cliente cadastrado com este e-mail."
+                detail="Já existe uma conta com este e-mail. Tente fazer login."
             )
 
         customer = Customer(
@@ -316,10 +383,14 @@ class AuthService:
         else:
             send_2fa_email_code(cust.name, cust.email, code)
 
+        # O código NUNCA é devolvido na resposta: ele só chega ao cliente via e-mail.
+        # (Antes existia um atalho de dev que ecoava o código aqui — furo de segurança:
+        # qualquer chamador obtinha o código sem acesso à caixa postal.)
+        # Em desenvolvimento, o verify aceita o atalho "123456" (_dev_2fa_shortcuts_enabled).
         return {
             "success": True,
             "message": "Código de verificação enviado para o e-mail cadastrado.",
-            "code": code if _dev_2fa_shortcuts_enabled() else None,
+            "expiresInSeconds": 600,
         }
 
     def verify_customer_2fa(
@@ -402,10 +473,110 @@ class AuthService:
         self.db.commit()
         return {"success": True, "message": "Senha alterada com sucesso!"}
 
+    PASSWORD_RESET_TOKEN_EXPIRE_MINUTES = 30
+
+    def forgot_password(self, email: str, background_tasks: BackgroundTasks) -> Dict[str, Any]:
+        """
+        Solicitação de recuperação de senha por e-mail.
+        - Resposta idêntica exista ou não a conta (evita enumeração de e-mails).
+        - Token aleatório (32 bytes), guardado APENAS como hash SHA-256,
+          com validade de 30 minutos e uso único.
+        - Novas solicitações invalidam links anteriores ainda pendentes.
+        """
+        email_clean = (email or "").strip().lower()
+        customer = (
+            self.db.query(Customer)
+            .filter(Customer.email == email_clean, Customer.is_active == True)  # noqa: E712
+            .first()
+        )
+        if customer:
+            # Invalida solicitações anteriores ainda pendentes do mesmo cliente
+            self.db.query(CustomerPasswordResetToken).filter(
+                CustomerPasswordResetToken.customer_id == customer.id,
+                CustomerPasswordResetToken.used_at.is_(None),
+            ).delete(synchronize_session=False)
+
+            raw_token = secrets.token_urlsafe(32)
+            self.db.add(
+                CustomerPasswordResetToken(
+                    customer_id=customer.id,
+                    token_hash=hashlib.sha256(raw_token.encode()).hexdigest(),
+                    expires_at=datetime.now(timezone.utc)
+                    + timedelta(minutes=self.PASSWORD_RESET_TOKEN_EXPIRE_MINUTES),
+                )
+            )
+            self.db.commit()
+
+            base = settings.FRONTEND_URL.rstrip("/")
+            reset_url = f"{base}/redefinir-senha?token={raw_token}"
+            background_tasks.add_task(
+                send_password_reset_email, customer.name, customer.email, reset_url
+            )
+
+        return {
+            "success": True,
+            "message": "Se o e-mail estiver cadastrado, você receberá um link para redefinir sua senha.",
+        }
+
+    def reset_password(self, token: str, new_password: str) -> Dict[str, Any]:
+        """Redefine a senha usando o token recebido por e-mail (uso único, 30 min)."""
+        invalid_msg = "Link de recuperação inválido ou expirado. Solicite um novo."
+
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        row = (
+            self.db.query(CustomerPasswordResetToken)
+            .filter(CustomerPasswordResetToken.token_hash == token_hash)
+            .first()
+        )
+        if not row or row.used_at is not None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=invalid_msg)
+
+        # Comparação robusta entre Postgres (tz-aware) e SQLite (tz-naive)
+        expires_at = (
+            row.expires_at
+            if row.expires_at.tzinfo
+            else row.expires_at.replace(tzinfo=timezone.utc)
+        )
+        if expires_at < datetime.now(timezone.utc):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=invalid_msg)
+
+        customer = self.db.query(Customer).filter(Customer.id == row.customer_id).first()
+        if not customer or not customer.is_active:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=invalid_msg)
+
+        customer.password_hash = get_password_hash(new_password.strip())
+        row.used_at = datetime.now(timezone.utc)
+        # Grava o consumo do token antes de limpar os demais (evita que o
+        # DELETE em massa apague o próprio registro que está sendo marcado)
+        self.db.flush()
+        # Invalida qualquer outro link pendente do mesmo cliente
+        self.db.query(CustomerPasswordResetToken).filter(
+            CustomerPasswordResetToken.customer_id == customer.id,
+            CustomerPasswordResetToken.used_at.is_(None),
+            CustomerPasswordResetToken.id != row.id,
+        ).delete(synchronize_session=False)
+        self.db.commit()
+
+        # Derruba sessões existentes: access/refresh tokens emitidos antes do
+        # reset deixam de ser aceitos (um comprometimento não sobrevive à
+        # redefinição). Tokens de logins futuros continuam válidos. (SECURITY_BACKLOG #2)
+        from app.core.token_revocation import revoke_subject_tokens
+        revoke_subject_tokens(self.db, customer.id)
+
+        return {
+            "success": True,
+            "message": "Senha redefinida com sucesso! Você já pode entrar com a nova senha.",
+        }
+
     def refresh_token(self, refresh_token_str: str) -> Dict[str, Any]:
         payload = decode_refresh_token(refresh_token_str)
         from app.core.token_revocation import is_token_revoked
-        if payload and is_token_revoked(self.db, payload.get("jti")):
+        if payload and is_token_revoked(
+            self.db,
+            payload.get("jti"),
+            subject=payload.get("sub"),
+            issued_at=payload.get("iat"),
+        ):
             payload = None
         if not payload:
             raise HTTPException(

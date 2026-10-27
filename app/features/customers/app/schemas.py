@@ -40,7 +40,9 @@ class CustomerBase(BaseModel):
 
 
 class CustomerCreate(CustomerBase):
-    password: Optional[str] = None
+    # Cadastro público exige senha: contas novas jamais são criadas sem senha,
+    # evitando sequestro de conta por "primeiro login" (hijack pré-cadastro).
+    password: str = Field(..., min_length=6)
 
     @field_validator("cpf", mode="before")
     @classmethod

@@ -47,6 +47,7 @@ class Booking(Base):
     final_amount = Column(Numeric(10, 2), nullable=False, default=0.00)
 
     # Faturamento e Vouchers
+    coupon_code = Column(String(50), nullable=True, index=True)  # cupom aplicado no checkout (se houver)
     pix_code = Column(Text, nullable=True)
     pix_qr_code_url = Column(Text, nullable=True)
     pix_expires_at = Column(DateTime(timezone=True), nullable=True)

@@ -2,7 +2,7 @@
 
 Backend completo e de alta performance da plataforma **Zarpou Viagens e Turismo**, desenvolvido em **Python 3** com arquitetura moderna baseada em **FastAPI**, **SQLAlchemy 2.0**, **Pydantic v2** e autenticação **JWT**.
 
-O sistema fornece uma suíte completa de 12 módulos de APIs RESTful conectadas 1:1 ao frontend Next.js (`C:\Users\jessicabandeira\dev\freelance-zarpou`), abrangendo busca de hotéis, emissão de voos e pacotes, geração de reservas com localizador oficial (**PNR** no padrão `ZRP-XXXXXX`), faturamento corporativo para empresas (**Zarpou Empresas B2B**), pagamentos Pix/Cartão/Boleto, CRM de consultoria de viagens e o **Concierge Virtual com Inteligência Artificial**.
+O sistema fornece uma suíte completa de 12 módulos de APIs RESTful conectadas 1:1 ao frontend Next.js (`C:\Users\jessicabandeira\dev\freelance-zarpou`), abrangendo busca de hotéis, emissão de voos e pacotes, geração de reservas com localizador oficial (**PNR** no padrão `ZRP-XXXXXX`), pagamentos Pix/Cartão/Boleto, CRM de consultoria de viagens e o **Concierge Virtual com Inteligência Artificial**.
 
 ---
 
@@ -57,7 +57,6 @@ zarpou-backend/
 │   └── main.py                   # Inicialização da aplicação, CORS e lifespan
 ├── tests/                        # Suíte completa de testes automatizados end-to-end
 ├── schema.sql                    # Modelagem SQL DDL de 21 tabelas e dados iniciais
-├── ESPECIFICACOES_BACKEND.md     # Especificação técnica detalhada de arquitetura
 ├── requirements.txt              # Dependências Python instaladas
 ├── .env.example                  # Variáveis de ambiente de referência
 ├── .env                          # Configurações ativas para ambiente local
@@ -112,13 +111,13 @@ Conforme diretriz do projeto, as chaves e credenciais sensíveis de integraçõe
 ### 1. Iniciar o Servidor FastAPI
 No terminal (PowerShell no Windows):
 ```powershell
-.\venv\Scripts\uvicorn app.main:app --reload --port 8000
+.\venv\Scripts\uvicorn app.main:app --reload --port 8008
 ```
 
 ### 2. Acessar a Documentação Interativa
-- **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
-- **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
-- **Health Check:** [http://localhost:8000/health](http://localhost:8000/health)
+- **Swagger UI:** [http://localhost:8008/docs](http://localhost:8008/docs)
+- **ReDoc:** [http://localhost:8008/redoc](http://localhost:8008/redoc)
+- **Health Check:** [http://localhost:8008/health](http://localhost:8008/health)
 
 ### 3. Executar os Testes Automatizados
 ```powershell
@@ -154,6 +153,38 @@ Para utilizar o Supabase PostgreSQL em ambiente de produção:
 Para conectar o frontend (`C:\Users\jessicabandeira\dev\freelance-zarpou`):
 1. No arquivo `.env.local` do frontend:
    ```env
-   NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+   NEXT_PUBLIC_API_URL=http://localhost:8008/api/v1
    ```
 2. Todas as rotas expostas em `/api/v1` respondem nos formatos das stores Zustand (`booking-store.ts`, `product-store.ts`, `auth-store.ts`, `config-store.ts`, `destination-store.ts`).
+
+
+---
+
+## Importacao em Massa de Catalogo (CSV/Excel + Celery)
+
+O painel administrativo permite importar e atualizar catalogo em larga escala
+(hospedagens, destinos, passagens, promocoes e cupons) via planilhas CSV/XLSX:
+
+1. O upload (POST /api/v1/imports/{resource}) apenas salva o arquivo e cria um
+   ImportJob — a resposta e imediata (sem timeout 504 em arquivos grandes).
+2. O processamento roda em background no **Celery + Redis** (validacao linha a
+   linha, coercao de tipos e upsert por codigo; falhas nao derrubam a carga).
+3. O relatorio final (GET /api/v1/imports/{resource}/jobs) informa quantas
+   linhas importaram e quais falharam, com o motivo de cada linha.
+
+Para rodar localmente e necessario o Redis e o worker Celery:
+
+`ash
+# Redis (Docker, porta 6379)
+docker run -d -p 6379:6379 redis:alpine
+
+# Worker Celery (Windows: --pool=solo)
+celery -A app.core.celery_app.celery_app worker -l info --pool=solo
+`
+
+Configuravel via .env: REDIS_URL=redis://localhost:6379/0 (e
+CELERY_BROKER_URL/CELERY_RESULT_BACKEND para sobrescrever).
+
+Templates de planilha (CSV/XLSX) ficam em
+GET /api/v1/imports/{resource}/template. Jobs interrompidos por restart sao
+marcados como falhos no startup do servidor.

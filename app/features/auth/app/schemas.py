@@ -31,7 +31,8 @@ class LoginRequest(BaseModel):
 
 class CustomerLoginRequest(BaseModel):
     email: str
-    password: Optional[str] = None
+    # Login SEM senha é proibido (OWASP A07): a senha é obrigatória e sempre verificada.
+    password: str = Field(..., min_length=1)
 
 
 class Customer2FaConfig(BaseModel):
@@ -64,3 +65,13 @@ class Customer2FaSendCode(BaseModel):
 class CustomerChangePassword(BaseModel):
     currentPassword: str
     newPassword: str
+
+
+class CustomerForgotPassword(BaseModel):
+    email: EmailStr
+
+
+class CustomerResetPassword(BaseModel):
+    token: str = Field(..., min_length=10)
+    # Mesma regra do cadastro: senha nova com no mínimo 6 caracteres
+    password: str = Field(..., min_length=6)

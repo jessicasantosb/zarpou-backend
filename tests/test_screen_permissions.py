@@ -20,8 +20,9 @@ def test_superadmin_has_access_to_all_screens():
     token = login_res.json()["access_token"]
     user_info = login_res.json()["user"]
     assert "allowedScreens" in user_info
-    assert len(user_info["allowedScreens"]) == 10
+    assert len(user_info["allowedScreens"]) == 11
     assert "hospedagens" in user_info["allowedScreens"]
+    assert "cupons" in user_info["allowedScreens"]
 
     headers = {"Authorization": f"Bearer {token}"}
 

@@ -46,9 +46,14 @@ def test_admin_login_returns_refresh_token_and_can_refresh():
 
 
 def test_customer_login_returns_refresh_token_and_can_refresh():
-    # 1. Login com cliente
+    # 1. Registrar e logar cliente (login exige cadastro prévio)
     email = f"refresh.test.{int(time.time())}@exemplo.com"
     pwd = "minhaSenhaSegura123"
+    reg_res = client.post(
+        "/api/v1/auth/customer/register",
+        json={"name": "Cliente Refresh", "email": email, "password": pwd},
+    )
+    assert reg_res.status_code in (201, 400)  # 400 = já cadastrado em execução anterior
     login_res = client.post("/api/v1/auth/customer/login", json={"email": email, "password": pwd})
     assert login_res.status_code == 200
     data = login_res.json()
@@ -130,10 +135,25 @@ def test_invalid_refresh_token_rejected():
 
 
 def test_storage_upload_validation_and_local_fallback():
+    # Upload exige autenticação de administrador
+    res_anon = client.post(
+        "/api/v1/storage/upload?folder=banners",
+        files={"file": ("arquivo.png", io.BytesIO(b"\x89PNG"), "image/png")},
+    )
+    assert res_anon.status_code == 401
+
+    login_res = client.post(
+        "/api/v1/auth/login",
+        json={"email": "admin@zarpou.com.br", "password": "admin123"},
+    )
+    assert login_res.status_code == 200
+    headers = {"Authorization": f"Bearer {login_res.json()['access_token']}"}
+
     # 1. Upload de arquivo com tipo inválido (ex: texto simples)
     invalid_file = io.BytesIO(b"conteudo de texto nao permitido")
     res_invalid = client.post(
         "/api/v1/storage/upload?folder=banners",
+        headers=headers,
         files={"file": ("arquivo.txt", invalid_file, "text/plain")},
     )
     assert res_invalid.status_code == 400
@@ -144,6 +164,7 @@ def test_storage_upload_validation_and_local_fallback():
     valid_file = io.BytesIO(png_bytes)
     res_upload = client.post(
         "/api/v1/storage/upload?folder=promocoes",
+        headers=headers,
         files={"file": ("banner-promo.png", valid_file, "image/png")},
     )
     assert res_upload.status_code == 200, res_upload.text

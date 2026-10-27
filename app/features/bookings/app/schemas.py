@@ -96,6 +96,7 @@ class BookingCreate(BaseModel):
     creditCard: Optional[CreditCardDataSchema] = None
     companyId: Optional[str] = None
     costCenter: Optional[str] = None
+    couponCode: Optional[str] = None  # cupom de desconto aplicado no checkout
 
 
 class BookingStatusUpdate(BaseModel):
@@ -118,6 +119,7 @@ class BookingResponse(BaseModel):
     installments: int
     companyId: Optional[str] = None
     costCenter: Optional[str] = None
+    couponCode: Optional[str] = None
     pricing: PriceSummarySchema
     pixCode: Optional[str] = None
     pixQrCodeUrl: Optional[str] = None

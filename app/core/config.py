@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     # Rate Limiting (OWASP A04/A07) - pode ser desativado em testes automatizados
     RATE_LIMIT_ENABLED: bool = True
 
+    # Celery / Redis (fila de processamento em background, ex.: importações em massa)
+    REDIS_URL: str = "redis://localhost:6379/0"
+    CELERY_BROKER_URL: str = ""  # vazio => REDIS_URL
+    CELERY_RESULT_BACKEND: str = ""  # vazio => REDIS_URL
+
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
@@ -51,6 +56,8 @@ class Settings(BaseSettings):
 
     # Integrations
     RESEND_API_KEY: str = ""
+    # Base do site usado nos links enviados por e-mail (ex.: recuperação de senha)
+    FRONTEND_URL: str = "https://www.zarpouviagens.com.br"
     AI_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
     GROQ_API_KEY: str = ""

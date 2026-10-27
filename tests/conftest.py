@@ -14,7 +14,7 @@ def _ensure_schema():
     from app.core.database import Base, engine, SessionLocal
     import app.models  # noqa: F401
     from app.main import _apply_column_migrations
-    from app.core.security import get_password_hash
+    from app.core.security import get_password_hash, verify_password
     from app.features.users.infra.models import User, ALL_ADMIN_SCREENS
 
     Base.metadata.create_all(bind=engine)
@@ -49,6 +49,28 @@ def _ensure_schema():
             )
             db.add(juliana)
 
+        db.commit()
+
+        # Reseta o crédito corporativo consumido por execuções anteriores da suíte,
+        # para que o checkout B2B do e2e seja repetível no mesmo banco de desenvolvimento.
+        from app.models.company import Company
+        db.query(Company).filter(Company.credit_used > 0).update({Company.credit_used: 0})
+
+        # Reativa contas de teste deixadas inativas por execuções anteriores:
+        # um admin inativo derruba TODOS os logins da suíte (cascade de falhas).
+        db.query(User).filter(User.email.in_([
+            "admin@zarpou.com.br",
+            "juliana.costa@zarpou.com.br",
+        ])).update({User.is_active: True}, synchronize_session=False)
+
+        # Garante a senha padrão da suíte: a suíte assume admin123 para os dois
+        # logins de teste; regrava o hash caso a conta tenha sido alterada fora.
+        for test_user in db.query(User).filter(User.email.in_([
+            "admin@zarpou.com.br",
+            "juliana.costa@zarpou.com.br",
+        ])).all():
+            if not verify_password("admin123", test_user.password_hash):
+                test_user.password_hash = get_password_hash("admin123")
         db.commit()
     finally:
         db.close()

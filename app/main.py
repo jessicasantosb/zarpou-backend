@@ -25,6 +25,13 @@ _STARTUP_COLUMN_MIGRATIONS = {
         "consent_ip": "VARCHAR(64)",
         "anonymized_at": "TIMESTAMP WITH TIME ZONE",
     },
+    "coupons": {
+        "notification_sent": "BOOLEAN NOT NULL DEFAULT FALSE",
+        "notification_sent_at": "TIMESTAMP WITH TIME ZONE",
+    },
+    "bookings": {
+        "coupon_code": "VARCHAR(50)",
+    },
 }
 
 
@@ -45,12 +52,31 @@ def _apply_column_migrations() -> None:
                         ddl = ddl.replace("TIMESTAMP WITH TIME ZONE", "DATETIME")
                     conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
 
+        # Migração de tipo: o segredo TOTP dos administradores passou a ser cifrado
+        # em repouso (Fernet, prefixo 'enc:'), que ocupa mais que o VARCHAR(64)
+        # original. No SQLite a largura não é aplicada (affinity) — só o Postgres
+        # precisa do ALTER (idempotente: só roda enquanto o tipo ainda for 64).
+        if "users" in existing_tables and engine.dialect.name == "postgresql":
+            user_cols = {c["name"]: str(c["type"]) for c in inspector.get_columns("users")}
+            if "64" in user_cols.get("two_factor_secret", ""):
+                conn.execute(text("ALTER TABLE users ALTER COLUMN two_factor_secret TYPE VARCHAR(255)"))
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Inicialização: criar tabelas e migrações estruturais necessárias
     Base.metadata.create_all(bind=engine)
     _apply_column_migrations()
+
+    # Jobs de importação órfãos (servidor reiniciou no meio de uma carga)
+    from app.core.database import SessionLocal
+    from app.features.imports.app.services import recover_stale_jobs
+
+    db = SessionLocal()
+    try:
+        recover_stale_jobs(db)
+    finally:
+        db.close()
     yield
 
 

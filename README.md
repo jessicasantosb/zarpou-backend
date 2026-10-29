@@ -1,190 +1,196 @@
-# 🛫 Zarpou Viagens e Turismo — Backend API (Python / FastAPI)
+# 🛫 Zarpou Travel and Tourism — Backend API (Python / FastAPI)
 
-Backend completo e de alta performance da plataforma **Zarpou Viagens e Turismo**, desenvolvido em **Python 3** com arquitetura moderna baseada em **FastAPI**, **SQLAlchemy 2.0**, **Pydantic v2** e autenticação **JWT**.
+Complete, high-performance backend for the **Zarpou Travel and Tourism** platform, built with **Python 3**, using a modern architecture based on **FastAPI**, **SQLAlchemy 2.0**, **Pydantic v2**, and **JWT** authentication.
 
-O sistema fornece uma suíte completa de 12 módulos de APIs RESTful conectadas 1:1 ao frontend Next.js (`C:\Users\jessicabandeira\dev\freelance-zarpou`), abrangendo busca de hotéis, emissão de voos e pacotes, geração de reservas com localizador oficial (**PNR** no padrão `ZRP-XXXXXX`), pagamentos Pix/Cartão/Boleto, CRM de consultoria de viagens e o **Concierge Virtual com Inteligência Artificial**.
-
----
-
-## 🛠️ Tecnologias e Arquitetura
-
-- **Linguagem:** Python 3.10+ (testado no Python 3.14)
-- **Framework Web:** FastAPI (alta performance, tipagem estática e documentação OpenAPI/Swagger interativa)
-- **Servidor ASGI:** Uvicorn com suporte a reload automático
-- **ORM / Banco de Dados:** SQLAlchemy 2.0 & SQLite (local zero-setup) / PostgreSQL (Supabase em produção)
-- **Validação e Serialização:** Pydantic v2 com `ConfigDict(from_attributes=True)` e aliases camelCase
-- **Segurança & Criptografia:** Bcrypt (hashing de senhas seguro) e PyJWT (tokens de acesso Bearer)
-- **Testes Automatizados:** Pytest e FastAPI TestClient com 100% de aprovação end-to-end
-- **Integrações de Terceiros:**
-  - **IA Concierge:** OpenAI / Groq com fallback nativo inteligente em português e ações contextuais recomendadas
-  - **E-mails Transacionais:** Resend API via background tasks assíncronas
-  - **Gateways de Pagamento:** MercadoPago / Asaas / Stripe com geração de QR Code Pix e boleto
-  - **WhatsApp API:** Meta Cloud API e links de redirecionamento dinâmico
+The system provides a complete suite of 12 REST API modules connected 1:1 to the Next.js frontend (`C:\Users\jessicabandeira\dev\freelance-zarpou`), covering hotel search, flight and travel package listings, bookings with official booking references (**PNR** in the `ZRP-XXXXXX` format), Pix/card/bank slip payments, travel consulting CRM, and the **AI-powered Virtual Concierge**.
 
 ---
 
-## 📁 Estrutura do Projeto
+## 🛠️ Technology Stack and Architecture
+
+- **Language:** Python 3.10+ (tested with Python 3.14)
+- **Web framework:** FastAPI (high performance, type hints, and interactive OpenAPI/Swagger documentation)
+- **ASGI server:** Uvicorn with automatic reload support
+- **ORM / Database:** SQLAlchemy 2.0 & SQLite (zero-setup local development) / PostgreSQL (Supabase in production)
+- **Validation and serialization:** Pydantic v2 with `ConfigDict(from_attributes=True)` and camelCase aliases
+- **Security and cryptography:** Bcrypt (secure password hashing) and PyJWT (Bearer access tokens)
+- **Automated tests:** Pytest and FastAPI TestClient with end-to-end coverage
+- **Third-party integrations:**
+  - **AI Concierge:** OpenAI / Groq with an intelligent built-in fallback in Portuguese and recommended contextual actions
+  - **Transactional email:** Resend API via asynchronous background tasks
+  - **Payment gateways:** MercadoPago / Asaas / Stripe with Pix QR code and bank slip generation
+  - **WhatsApp API:** Meta Cloud API and dynamic redirect links
+
+---
+
+## 📁 Project Structure
 
 ```text
 zarpou-backend/
 ├── app/
 │   ├── api/
-│   │   ├── deps.py               # Injeção de dependências e proteção JWT (Admin, Cliente, Empresa)
-│   │   └── router.py             # Roteador central unificado que agrega todas as features
-│   ├── features/                 # Módulos de negócio (Clean Architecture: domain, app, infra)
-│   │   ├── addons/               # Adicionais (seguro viagem, bagagem, traslados)
-│   │   ├── agency/               # Configurações da agência, Hero e métricas
-│   │   ├── auth/                 # Autenticação JWT, 2FA e recuperação
-│   │   ├── bookings/             # Checkout, PNR (ZRP-XXXXXX), Pix QR Code, Faturamento PJ
-│   │   ├── chat/                 # Concierge Virtual de Viagens com IA e histórico
-│   │   ├── companies/            # Portal Zarpou Empresas (B2B, Colaboradores, Faturamento)
-│   │   ├── customers/            # Clientes e viajantes B2C (LGPD)
-│   │   ├── destinations/         # Destinos turísticos nacionais e internacionais
-│   │   ├── flights/              # Passagens aéreas, trechos e conexões
-│   │   ├── hotels/               # Hotéis, quartos e disponibilidades
-│   │   ├── inquiries/            # CRM de consultoria de viagens personalizada
-│   │   ├── packages/             # Pacotes turísticos integrados (Aéreo + Hotel)
-│   │   ├── promotions/           # Ofertas relâmpago, banners e notificações
-│   │   └── users/                # Administradores e equipe do painel Zarpou
+│   │   ├── deps.py               # Dependency injection and JWT protection (Admin, Customer, Company)
+│   │   └── router.py             # Unified central router that aggregates all features
+│   ├── features/                 # Business modules (Clean Architecture: domain, app, infra)
+│   │   ├── addons/               # Add-ons (travel insurance, baggage, transfers)
+│   │   ├── agency/               # Agency settings, hero section, and metrics
+│   │   ├── auth/                 # JWT authentication, 2FA, and account recovery
+│   │   ├── bookings/             # Checkout, PNR (ZRP-XXXXXX), Pix QR code, corporate billing
+│   │   ├── chat/                 # AI-powered Virtual Travel Concierge and history
+│   │   ├── companies/            # Zarpou Business portal (B2B, employees, billing)
+│   │   ├── customers/            # B2C customers and travelers (LGPD)
+│   │   ├── destinations/         # Domestic and international tourist destinations
+│   │   ├── flights/              # Airfares, segments, and connections
+│   │   ├── hotels/               # Hotels, rooms, and availability
+│   │   ├── inquiries/            # Personalized travel consulting CRM
+│   │   ├── packages/             # Combined travel packages (flight + hotel)
+│   │   ├── promotions/           # Flash deals, banners, and notifications
+│   │   └── users/                # Administrators and Zarpou dashboard staff
 │   ├── core/
-│   │   ├── config.py             # Variáveis de ambiente e Pydantic BaseSettings
-│   │   ├── database.py           # Engine SQLAlchemy, sessões e Base
-│   │   └── security.py           # Bcrypt e criação/decodificação de tokens JWT
-│   ├── models/                   # Re-exports unificados ORM SQLAlchemy
-│   ├── schemas/                  # Schemas de validação e serialização Pydantic v2
+│   │   ├── config.py             # Environment variables and Pydantic BaseSettings
+│   │   ├── database.py           # SQLAlchemy engine, sessions, and Base
+│   │   └── security.py           # Bcrypt and JWT token creation/decoding
+│   ├── models/                   # Unified SQLAlchemy ORM re-exports
+│   ├── schemas/                  # Pydantic v2 validation and serialization schemas
 │   ├── seeds/
-│   │   └── seed_data.py          # Carga automática de dados do catálogo
-│   └── main.py                   # Inicialização da aplicação, CORS e lifespan
-├── tests/                        # Suíte completa de testes automatizados end-to-end
-├── schema.sql                    # Modelagem SQL DDL de 21 tabelas e dados iniciais
-├── requirements.txt              # Dependências Python instaladas
-├── .env.example                  # Variáveis de ambiente de referência
-├── .env                          # Configurações ativas para ambiente local
-└── README.md                     # Documentação do projeto
+│   │   └── seed_data.py          # Automatic catalog data loading
+│   └── main.py                   # Application startup, CORS, and lifespan
+├── tests/                        # Automated end-to-end test suite
+├── schema.sql                    # SQL DDL schema for 21 tables and initial data
+├── requirements.txt              # Python dependencies
+├── .env.example                  # Reference environment variables
+├── .env                          # Active local environment configuration
+└── README.md                     # Project documentation
 ```
 
 ---
 
-## 🗄️ Modelagem de Dados (`schema.sql` — 21 Tabelas)
+## 🗄️ Data Schema (`schema.sql` — 21 Tables)
 
-O arquivo [`schema.sql`](file:///c:/Users/jessicabandeira/dev/zarpou-backend/schema.sql) contém o script DDL ANSI-SQL completo e otimizado para PostgreSQL (Supabase) e SQLite:
+The [`schema.sql`](schema.sql) file contains the complete ANSI SQL DDL script, optimized for PostgreSQL (Supabase) and SQLite:
 
-1. **`users`**: Administradores e agentes da Zarpou com controle de acesso (RBAC).
-2. **`customers`**: Viajantes registrados na agência (CPF, e-mail, telefone).
-3. **`companies`**: Empresas conveniadas no Zarpou Empresas (CNPJ, limite de crédito, desconto PJ).
-4. **`company_employees`**: Colaboradores autorizados a emitir viagens corporativas por centro de custo.
-5. **`company_invoices`**: Faturas quinzenais/mensais com boletos consolidados para faturamento PJ.
-6. **`destinations`**: Destinos turísticos nacionais e internacionais com preços a partir de.
-7. **`hero_configs`**: Configurações dinâmicas de títulos, vídeo de fundo e CTA da Home.
-8. **`hotels`**: Hotéis, resorts e pousadas, estrelas, avaliação e fotos.
-9. **`rooms`**: Categorias de quartos, capacidade de adultos/crianças, camas, cancelamento grátis e café da manhã.
-10. **`flights`**: Tarifas aéreas, destaques, regiões (EUA, Europa, América do Sul).
-11. **`flight_segments`**: Trechos de voo (ida e volta) com código de companhia aérea, horários e aeroportos IATA.
-12. **`packages`**: Combinação de hospedagem + aéreo com cálculo de parcelas em até 12x.
-13. **`promotions`**: Campanhas comerciais ("Oferta Relâmpago", "Nordeste dos Sonhos").
-14. **`addons`**: Serviços adicionais (Seguro Viagem, Bagagem Extra 23kg, Transfer VIP).
-15. **`bookings`**: Pedidos completos com localizador PNR único (ex: `ZRP-849201`), discriminação de valores e prazos.
-16. **`booking_travelers`**: Dados dos passageiros da reserva (CPF, data de nascimento, responsável).
-17. **`booking_addons`**: Serviços extras contratados em cada compra.
-18. **`payments`**: Registro de transações com gateways (Pix, Cartão de Crédito com parcelas, Boleto).
-19. **`contact_inquiries`**: Consultorias de roteiros solicitadas através do formulário interativo de múltiplos passos.
-20. **`agency_settings`**: Dados legais da empresa (CNPJ, Cadastur, WhatsApp, chaves de API dinâmicas).
-21. **`chat_logs`**: Histórico das interações do viajante com o Concierge Virtual.
-
----
-
-## 🔐 Gerenciamento Dinâmico de Credenciais
-
-Conforme diretriz do projeto, as chaves e credenciais sensíveis de integrações externas **não precisam ser fixadas em código nem no `.env`**:
-- Elas são inseridas e gerenciadas diretamente pelo administrador na tela de configurações do frontend (`/admin/configuracoes`).
-- São persistidas no banco de dados na tabela `agency_settings` via endpoint `PUT /api/v1/agency/settings`.
-- O backend carrega essas chaves em tempo de execução para:
-  - **`RESEND_API_KEY`**: Disparo de e-mails de confirmação e cotações.
-  - **`MERCADOPAGO_ACCESS_TOKEN`**: Processamento de pagamentos transparentes.
-  - **`WHATSAPP_API_TOKEN`**: Integração oficial de mensagens do WhatsApp Cloud.
-  - **`OPENAI_API_KEY` / `GROQ_API_KEY`**: Motor do Concierge Virtual inteligente.
+1. **`users`**: Zarpou administrators and agents with role-based access control (RBAC).
+2. **`customers`**: Agency travelers (CPF, email, phone).
+3. **`companies`**: Companies enrolled in Zarpou Business (CNPJ, credit limit, corporate discount).
+4. **`company_employees`**: Employees authorized to book corporate travel by cost center.
+5. **`company_invoices`**: Biweekly/monthly invoices with consolidated corporate billing slips.
+6. **`destinations`**: Domestic and international destinations with starting prices.
+7. **`hero_configs`**: Dynamic home page title, background video, and CTA settings.
+8. **`hotels`**: Hotels, resorts, and inns, including star ratings, reviews, and photos.
+9. **`rooms`**: Room categories, adult/child capacity, beds, free cancellation, and breakfast.
+10. **`flights`**: Airfares, featured deals, and regions (US, Europe, South America).
+11. **`flight_segments`**: Outbound and return flight segments with airline codes, times, and IATA airports.
+12. **`packages`**: Flight + accommodation bundles with installment calculations of up to 12 payments.
+13. **`promotions`**: Marketing campaigns ("Flash Deal", "Dream Northeast").
+14. **`addons`**: Additional services (travel insurance, extra 23 kg baggage, VIP transfer).
+15. **`bookings`**: Complete orders with a unique PNR (e.g. `ZRP-849201`), itemized amounts, and deadlines.
+16. **`booking_travelers`**: Passenger details for each booking (CPF, date of birth, responsible party).
+17. **`booking_addons`**: Extra services purchased with each booking.
+18. **`payments`**: Payment gateway transactions (Pix, credit card installments, bank slip).
+19. **`contact_inquiries`**: Travel consulting requests submitted through the multi-step interactive form.
+20. **`agency_settings`**: Legal company information (CNPJ, Cadastur, WhatsApp, dynamic API keys).
+21. **`chat_logs`**: Traveler interactions with the Virtual Concierge.
 
 ---
 
-## 🚀 Como Executar o Backend
+## 🔐 Dynamic Credential Management
 
-### 1. Iniciar o Servidor FastAPI
-No terminal (PowerShell no Windows):
+According to the project guidelines, sensitive third-party integration keys and credentials do **not** need to be hard-coded or stored in `.env`:
+
+- Administrators enter and manage them directly on the frontend settings page (`/admin/configuracoes`).
+- They are stored in the database in the `agency_settings` table via `PUT /api/v1/agency/settings`.
+- The backend loads these keys at runtime for:
+  - **`RESEND_API_KEY`**: Sending confirmation emails and quotes.
+  - **`MERCADOPAGO_ACCESS_TOKEN`**: Processing transparent payments.
+  - **`WHATSAPP_API_TOKEN`**: Official WhatsApp Cloud messaging integration.
+  - **`OPENAI_API_KEY` / `GROQ_API_KEY`**: Intelligent Virtual Concierge engine.
+
+---
+
+## 🚀 Running the Backend
+
+### 1. Start the FastAPI Server
+
+In a terminal (PowerShell on Windows):
+
 ```powershell
 .\venv\Scripts\uvicorn app.main:app --reload --port 8008
 ```
 
-### 2. Acessar a Documentação Interativa
+### 2. Open the Interactive Documentation
+
 - **Swagger UI:** [http://localhost:8008/docs](http://localhost:8008/docs)
 - **ReDoc:** [http://localhost:8008/redoc](http://localhost:8008/redoc)
-- **Health Check:** [http://localhost:8008/health](http://localhost:8008/health)
+- **Health check:** [http://localhost:8008/health](http://localhost:8008/health)
 
-### 3. Executar os Testes Automatizados
+### 3. Run the Automated Tests
+
 ```powershell
 .\venv\Scripts\python.exe -m pytest tests\test_e2e_full.py -v
 ```
-Todos os testes cobrem:
-- Health check e catálogo público de destinos, hotéis, voos, pacotes e promoções.
-- Autenticação e perfil de Administrador e Clientes B2C.
-- Fluxo corporativo B2B (cadastro de empresa, aprovação backoffice, colaboradores).
-- Checkout B2C com geração de PNR e Pix QR code.
-- Checkout B2B com faturamento à prazo (`corporate_invoice`), desconto PJ e dedução de crédito.
-- Envio e listagem de formulários de consultoria (CRM Leads).
-- Configurações da agência e métricas consolidadas do dashboard.
-- Concierge Virtual com respostas contextuais, links de ação e histórico de sessão.
 
+The tests cover:
+
+- Health check and public catalogs for destinations, hotels, flights, packages, and promotions.
+- Authentication and Admin and B2C Customer profiles.
+- B2B corporate flow (company registration, back-office approval, employees).
+- B2C checkout with PNR generation and Pix QR code.
+- B2B checkout with deferred billing (`corporate_invoice`), corporate discount, and credit deduction.
+- Submitting and listing consulting forms (CRM leads).
+- Agency settings and consolidated dashboard metrics.
+- Virtual Concierge contextual responses, action links, and session history.
 
 ---
 
-## 🌐 Conexão com Supabase em Produção
+## 🌐 Connecting to Supabase in Production
 
-Para utilizar o Supabase PostgreSQL em ambiente de produção:
-1. No painel do Supabase, copie a connection string no formato URI.
-2. Defina no arquivo `.env`:
+To use Supabase PostgreSQL in production:
+
+1. Copy the connection string URI from the Supabase dashboard.
+2. Set `DATABASE_URL` in the `.env` file:
+
    ```env
-   DATABASE_URL="postgresql+psycopg2://postgres:[SUA_SENHA]@db.[SEU_PROJETO].supabase.co:5432/postgres"
+   DATABASE_URL="postgresql+psycopg2://postgres:[YOUR_PASSWORD]@db.[YOUR_PROJECT].supabase.co:5432/postgres"
    ```
-3. Execute o script [`schema.sql`](file:///c:/Users/jessicabandeira/dev/zarpou-backend/schema.sql) diretamente no SQL Editor do Supabase ou deixe o lifespan do FastAPI criar automaticamente as 21 tabelas.
+
+3. Run [`schema.sql`](schema.sql) in the Supabase SQL Editor, or let the FastAPI lifespan create all 21 tables automatically.
 
 ---
 
-## 🔗 Integração com o Frontend Next.js
+## 🔗 Integrating with the Next.js Frontend
 
-Para conectar o frontend (`C:\Users\jessicabandeira\dev\freelance-zarpou`):
-1. No arquivo `.env.local` do frontend:
+Frontend repository: [freelance-zarpou](https://github.com/jessicasantosb/freelance-zarpou).
+
+To connect the frontend (`C:\Users\jessicabandeira\dev\freelance-zarpou`):
+
+1. Add the following to the frontend `.env.local` file:
+
    ```env
    NEXT_PUBLIC_API_URL=http://localhost:8008/api/v1
    ```
-2. Todas as rotas expostas em `/api/v1` respondem nos formatos das stores Zustand (`booking-store.ts`, `product-store.ts`, `auth-store.ts`, `config-store.ts`, `destination-store.ts`).
 
+2. All routes under `/api/v1` return data in the formats expected by the Zustand stores (`booking-store.ts`, `product-store.ts`, `auth-store.ts`, `config-store.ts`, `destination-store.ts`).
 
 ---
 
-## Importacao em Massa de Catalogo (CSV/Excel + Celery)
+## 📦 Bulk Catalog Import (CSV/Excel + Celery)
 
-O painel administrativo permite importar e atualizar catalogo em larga escala
-(hospedagens, destinos, passagens, promocoes e cupons) via planilhas CSV/XLSX:
+The admin dashboard supports large-scale catalog imports and updates (accommodations, destinations, flights, promotions, and coupons) from CSV/XLSX spreadsheets:
 
-1. O upload (POST /api/v1/imports/{resource}) apenas salva o arquivo e cria um
-   ImportJob — a resposta e imediata (sem timeout 504 em arquivos grandes).
-2. O processamento roda em background no **Celery + Redis** (validacao linha a
-   linha, coercao de tipos e upsert por codigo; falhas nao derrubam a carga).
-3. O relatorio final (GET /api/v1/imports/{resource}/jobs) informa quantas
-   linhas importaram e quais falharam, com o motivo de cada linha.
+1. The upload (`POST /api/v1/imports/{resource}`) only saves the file and creates an `ImportJob`; the response is immediate, avoiding 504 timeouts for large files.
+2. Processing runs in the background with **Celery + Redis** (row-by-row validation, type coercion, and upsert by code; failures do not stop the import).
+3. The final report (`GET /api/v1/imports/{resource}/jobs`) shows how many rows were imported and which rows failed, including the reason for each failure.
 
-Para rodar localmente e necessario o Redis e o worker Celery:
+To run locally, Redis and a Celery worker are required:
 
-`ash
-# Redis (Docker, porta 6379)
+```bash
+# Redis (Docker, port 6379)
 docker run -d -p 6379:6379 redis:alpine
 
-# Worker Celery (Windows: --pool=solo)
+# Celery worker (Windows: --pool=solo)
 celery -A app.core.celery_app.celery_app worker -l info --pool=solo
-`
+```
 
-Configuravel via .env: REDIS_URL=redis://localhost:6379/0 (e
-CELERY_BROKER_URL/CELERY_RESULT_BACKEND para sobrescrever).
+Configure with `.env`: `REDIS_URL=redis://localhost:6379/0` (use `CELERY_BROKER_URL` / `CELERY_RESULT_BACKEND` to override).
 
-Templates de planilha (CSV/XLSX) ficam em
-GET /api/v1/imports/{resource}/template. Jobs interrompidos por restart sao
-marcados como falhos no startup do servidor.
+Spreadsheet templates (CSV/XLSX) are available at `GET /api/v1/imports/{resource}/template`. Jobs interrupted by a server restart are marked as failed at startup.

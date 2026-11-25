@@ -24,6 +24,7 @@ def get_current_user_payload(
         payload.get("jti"),
         subject=payload.get("sub"),
         issued_at=payload.get("iat"),
+        issued_at_us=payload.get("issued_at_us"),
     ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -55,6 +56,8 @@ def get_current_admin_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuário não encontrado ou inativo.",
         )
+    if not user.accepts_session(payload):
+        raise HTTPException(status_code=401, detail="Faça login novamente.")
     return user
 
 
@@ -123,7 +126,7 @@ def get_current_company_user(
     if payload.get("role") != "company":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso restrito a contas empresariais Zarpou Empresas.",
+            detail="Acesso restrito a contas empresariais Fly Promo Empresas.",
         )
     company_id = payload.get("sub")
     company = db.query(Company).filter(Company.id == company_id).first()
@@ -135,7 +138,7 @@ def get_current_company_user(
     if company.status == "bloqueada":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Conta corporativa suspensa ou bloqueada. Entre em contato com a Zarpou.",
+            detail="Conta corporativa suspensa ou bloqueada. Entre em contato com a Fly Promo.",
         )
     return company
 

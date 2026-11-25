@@ -59,7 +59,7 @@ def test_03_authentication_flows():
     # 1. Login Admin Padrão (JSON)
     login_adm = client.post(
         "/api/v1/auth/login",
-        json={"email": "admin@zarpou.com.br", "password": "admin123"},
+        json={"email": "admin@example.com", "password": "admin123"},
     )
     assert login_adm.status_code == 200
     adm_token = login_adm.json()["access_token"]
@@ -98,7 +98,7 @@ def test_03_authentication_flows():
 
 def test_04_b2b_corporate_portal():
     # Obter token de Admin
-    login_adm = client.post("/api/v1/auth/login", json={"email": "admin@zarpou.com.br", "password": "admin123"})
+    login_adm = client.post("/api/v1/auth/login", json={"email": "admin@example.com", "password": "admin123"})
     adm_token = login_adm.json()["access_token"]
     adm_headers = {"Authorization": f"Bearer {adm_token}"}
 
@@ -298,7 +298,7 @@ def test_06_inquiries_and_crm():
     assert res.json()["status"] == "novo"
 
     # Admin consulta leads
-    login_adm = client.post("/api/v1/auth/login", json={"email": "admin@zarpou.com.br", "password": "admin123"})
+    login_adm = client.post("/api/v1/auth/login", json={"email": "admin@example.com", "password": "admin123"})
     adm_token = login_adm.json()["access_token"]
     leads = client.get("/api/v1/inquiries", headers={"Authorization": f"Bearer {adm_token}"})
     assert leads.status_code == 200
@@ -306,7 +306,7 @@ def test_06_inquiries_and_crm():
 
 
 def test_07_agency_settings_and_metrics():
-    login_adm = client.post("/api/v1/auth/login", json={"email": "admin@zarpou.com.br", "password": "admin123"})
+    login_adm = client.post("/api/v1/auth/login", json={"email": "admin@example.com", "password": "admin123"})
     adm_token = login_adm.json()["access_token"]
     adm_headers = {"Authorization": f"Bearer {adm_token}"}
 

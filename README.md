@@ -1,8 +1,8 @@
-# 🛫 Zarpou Travel and Tourism — Backend API (Python / FastAPI)
+# 🛫 Fly Promo — Backend API (Python / FastAPI)
 
-Complete, high-performance backend for the **Zarpou Travel and Tourism** platform, built with **Python 3**, using a modern architecture based on **FastAPI**, **SQLAlchemy 2.0**, **Pydantic v2**, and **JWT** authentication.
+Complete, high-performance backend for the **Fly Promo** platform, built with **Python 3**, using a modern architecture based on **FastAPI**, **SQLAlchemy 2.0**, **Pydantic v2**, and **JWT** authentication.
 
-The system provides a complete suite of 12 REST API modules connected 1:1 to the Next.js frontend (`C:\Users\jessicabandeira\dev\freelance-zarpou`), covering hotel search, flight and travel package listings, bookings with official booking references (**PNR** in the `ZRP-XXXXXX` format), Pix/card/bank slip payments, travel consulting CRM, and the **AI-powered Virtual Concierge**.
+The system provides a complete suite of 12 REST API modules connected 1:1 to the Next.js frontend (`the frontend project`), covering hotel search, flight and travel package listings, bookings with official booking references (**PNR** in the `ZRP-XXXXXX` format), Pix/card/bank slip payments, travel consulting CRM, and the **AI-powered Virtual Concierge**.
 
 ---
 
@@ -26,7 +26,7 @@ The system provides a complete suite of 12 REST API modules connected 1:1 to the
 ## 📁 Project Structure
 
 ```text
-zarpou-backend/
+backend/
 ├── app/
 │   ├── api/
 │   │   ├── deps.py               # Dependency injection and JWT protection (Admin, Customer, Company)
@@ -37,7 +37,7 @@ zarpou-backend/
 │   │   ├── auth/                 # JWT authentication, 2FA, and account recovery
 │   │   ├── bookings/             # Checkout, PNR (ZRP-XXXXXX), Pix QR code, corporate billing
 │   │   ├── chat/                 # AI-powered Virtual Travel Concierge and history
-│   │   ├── companies/            # Zarpou Business portal (B2B, employees, billing)
+│   │   ├── companies/            # Fly Promo Business portal (B2B, employees, billing)
 │   │   ├── customers/            # B2C customers and travelers (LGPD)
 │   │   ├── destinations/         # Domestic and international tourist destinations
 │   │   ├── flights/              # Airfares, segments, and connections
@@ -45,7 +45,7 @@ zarpou-backend/
 │   │   ├── inquiries/            # Personalized travel consulting CRM
 │   │   ├── packages/             # Combined travel packages (flight + hotel)
 │   │   ├── promotions/           # Flash deals, banners, and notifications
-│   │   └── users/                # Administrators and Zarpou dashboard staff
+│   │   └── users/                # Administrators and Fly Promo dashboard staff
 │   ├── core/
 │   │   ├── config.py             # Environment variables and Pydantic BaseSettings
 │   │   ├── database.py           # SQLAlchemy engine, sessions, and Base
@@ -69,9 +69,9 @@ zarpou-backend/
 
 The [`schema.sql`](schema.sql) file contains the complete ANSI SQL DDL script, optimized for PostgreSQL (Supabase) and SQLite:
 
-1. **`users`**: Zarpou administrators and agents with role-based access control (RBAC).
+1. **`users`**: Fly Promo administrators and agents with role-based access control (RBAC).
 2. **`customers`**: Agency travelers (CPF, email, phone).
-3. **`companies`**: Companies enrolled in Zarpou Business (CNPJ, credit limit, corporate discount).
+3. **`companies`**: Companies enrolled in Fly Promo Business (CNPJ, credit limit, corporate discount).
 4. **`company_employees`**: Employees authorized to book corporate travel by cost center.
 5. **`company_invoices`**: Biweekly/monthly invoices with consolidated corporate billing slips.
 6. **`destinations`**: Domestic and international destinations with starting prices.
@@ -114,7 +114,9 @@ According to the project guidelines, sensitive third-party integration keys and 
 In a terminal (PowerShell on Windows):
 
 ```powershell
-.\venv\Scripts\uvicorn app.main:app --reload --port 8008
+python -m venv venv
+.\venv\Scripts\python.exe -m pip install -r requirements.txt
+.\venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8008
 ```
 
 ### 2. Open the Interactive Documentation
@@ -140,6 +142,90 @@ The tests cover:
 - Agency settings and consolidated dashboard metrics.
 - Virtual Concierge contextual responses, action links, and session history.
 
+### Local database commands (PowerShell)
+
+Run these commands from the backend root with the virtual environment set up. Use the same `.env` and `DATABASE_URL` as the running API.
+
+#### Check which database the backend uses
+
+```powershell
+.\venv\Scripts\python.exe -c 'from app.core.database import engine; print(engine.dialect.name); print(engine.url.database)'
+```
+
+The command prints the database engine and database name or path without printing the connection password.
+
+#### Inspect the SQLite tables
+
+These commands use the Python 3.12+ SQLite CLI. They resolve the configured file and stop if it does not exist.
+
+```powershell
+$dbPath = .\venv\Scripts\python.exe -c 'from pathlib import Path; from sys import argv; from app.core.database import engine; assert engine.dialect.name == argv[1]; print(Path(engine.url.database).resolve(strict=True))' sqlite
+if ($LASTEXITCODE -eq 0) {
+    .\venv\Scripts\python.exe -m sqlite3 $dbPath 'SELECT id, email, role, is_active FROM users ORDER BY email;'
+    .\venv\Scripts\python.exe -m sqlite3 $dbPath 'SELECT count(*) AS customers FROM customers;'
+}
+```
+
+`users` contains staff accounts for `/admin`. The public sign-up flow creates accounts in `customers`. An empty result from the first query means there are no staff accounts.
+
+#### Create an administrator in local SQLite
+
+Paste this block into PowerShell. It prompts for the name, email and password, then saves the account. Password input stays hidden. The command only creates accounts when the backend is configured for local SQLite in development.
+
+```powershell
+$adminScript = [System.IO.Path]::GetTempFileName()
+try {
+    @'
+from getpass import getpass
+
+from app.core.config import settings
+from app.core.database import SessionLocal, engine
+from app.core.security import get_password_hash
+from app.main import prepare_database_schema
+from app.models.user import User
+
+if engine.dialect.name != "sqlite" or settings.ENVIRONMENT.strip().lower() != "development":
+    raise SystemExit("This command requires SQLite in the development environment.")
+
+print(f"SQLite database: {engine.url.database}")
+name = input("Administrator name: ").strip()
+email = input("Email: ").strip().lower()
+if not name or not email:
+    raise SystemExit("Enter a name and an email address.")
+
+password = getpass("Password: ")
+if password != getpass("Confirm password: "):
+    raise SystemExit("The passwords do not match.")
+if not password.strip() or len(password) < 8 or len(password.encode("utf-8")) > 72:
+    raise SystemExit("Use at least 8 characters and at most 72 UTF-8 bytes.")
+
+prepare_database_schema()
+with SessionLocal() as db:
+    if db.query(User.id).filter(User.email == email).first():
+        raise SystemExit("A staff account already uses this email.")
+    db.add(User(name=name, email=email, role="admin", password_hash=get_password_hash(password)))
+    db.commit()
+
+print(f"Administrator created: {email}")
+'@ | Set-Content -LiteralPath $adminScript -Encoding utf8
+    .\venv\Scripts\python.exe -c 'from runpy import run_path; from sys import argv; run_path(argv[1])' $adminScript
+} finally {
+    Remove-Item -LiteralPath $adminScript
+}
+```
+
+Sign in at `/admin` with the email and the original password you entered.
+
+If login returns HTTP 500 with a Redis connection error at `localhost:6379`, leave `RATE_LIMIT_STORAGE_URI=` blank in your local `.env` and restart Uvicorn. The rate limiter uses memory with this setting, so local login works without Redis.
+
+#### Generate a bcrypt hash only
+
+Use this command when you need to populate `users.password_hash` manually.
+
+```powershell
+.\venv\Scripts\python.exe -c 'from getpass import getpass; from app.core.security import get_password_hash; print(get_password_hash(getpass()))'
+```
+
 ---
 
 ## 🌐 Connecting to Supabase in Production
@@ -153,15 +239,13 @@ To use Supabase PostgreSQL in production:
    DATABASE_URL="postgresql+psycopg2://postgres:[YOUR_PASSWORD]@db.[YOUR_PROJECT].supabase.co:5432/postgres"
    ```
 
-3. Run [`schema.sql`](schema.sql) in the Supabase SQL Editor, or let the FastAPI lifespan create all 21 tables automatically.
+3. Let the FastAPI lifespan prepare the database, or run the schema preparation command in the deploy step. The reference [`schema.sql`](schema.sql) includes demonstration data for local use.
 
 ---
 
 ## 🔗 Integrating with the Next.js Frontend
 
-Frontend repository: [freelance-zarpou](https://github.com/jessicasantosb/freelance-zarpou).
-
-To connect the frontend (`C:\Users\jessicabandeira\dev\freelance-zarpou`):
+To connect the frontend:
 
 1. Add the following to the frontend `.env.local` file:
 
@@ -170,6 +254,32 @@ To connect the frontend (`C:\Users\jessicabandeira\dev\freelance-zarpou`):
    ```
 
 2. All routes under `/api/v1` return data in the formats expected by the Zustand stores (`booking-store.ts`, `product-store.ts`, `auth-store.ts`, `config-store.ts`, `destination-store.ts`).
+
+### Deploying administrative authentication
+
+- Set `ENVIRONMENT=production` and a unique `SECRET_KEY` of at least 32 characters on Render. Set a separate `AUTH_SESSION_SECRET` of at least 32 characters on Vercel. Changing the backend key invalidates existing JWTs and affects TOTP secrets encrypted with the previous key, so plan re-enrollment or key migration if replacing an existing key.
+- Deploy the frontend and backend together. If an account has MFA enabled, the admin login returns a challenge and the panel verifies it before starting the session. Set the public HTTPS `FRONTEND_URL` and configure `RESEND_API_KEY` and `RESEND_FROM_EMAIL` on Render. Use a sender address verified by Resend and set the real `CONTACT_EMAIL` and `PRIVACY_EMAIL` for Fly Promo.
+- With multiple API instances, set `RATE_LIMIT_STORAGE_URI` to the same Redis URI on each instance. To run the existing schema updates once per release, run `python -c "from app.main import prepare_database_schema; prepare_database_schema()"` in the deploy step and set `SCHEMA_MIGRATIONS_ON_STARTUP=False` on the web instances after that step is configured.
+
+---
+
+## Geographic reference catalog
+
+Import the [GeoNames data exports](https://www.geonames.org/export) into the database configured by `DATABASE_URL` before using the location endpoints.
+
+```powershell
+.\venv\Scripts\python.exe -m scripts.import_locations
+```
+
+To reuse downloaded files, pass `--source-dir` with a directory containing `countryInfo.txt`, `admin1CodesASCII.txt`, and `cities500.zip`. Run the import again to refresh the catalog. Each import replaces the three reference tables in one transaction. The city export covers populated places with more than 500 residents and selected administrative seats. The data is provided by GeoNames under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Include GeoNames attribution when displaying the data.
+
+| Route | Result |
+| --- | --- |
+| `GET /api/v1/locations/countries` | Countries with their two-letter codes |
+| `GET /api/v1/locations/countries/{country_code}/states` | First-level administrative divisions of the country |
+| `GET /api/v1/locations/countries/{country_code}/cities` | Cities in the country with optional `state_code`, `q`, `limit`, and `offset` parameters |
+
+Use the `code` returned by the states route as `state_code`. Omit it to search across a country, including places without a state code. The city search matches the start of a name regardless of accents or case. `limit` defaults to 50 and accepts up to 100, and `offset` defaults to 0.
 
 ---
 

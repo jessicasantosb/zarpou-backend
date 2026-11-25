@@ -5,12 +5,12 @@ from typing import Optional
 @dataclass
 class AgencySettingEntity:
     id: str = "default"
-    company_name: str = "Zarpou Viagens e Turismo Ltda"
-    trading_name: str = "Zarpou Viagens"
+    company_name: str = "Fly Promo"
+    trading_name: str = "Fly Promo"
     cnpj: str = "55.849.201/0001-38"
     cadastur: str = "34.120.948/0001-90"
     whatsapp: str = "5531984210000"
-    email: str = "contato@zarpou.com.br"
+    email: str = ""
     phone: str = "(31) 3344-5500"
 
 

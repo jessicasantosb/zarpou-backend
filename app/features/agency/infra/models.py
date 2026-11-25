@@ -7,20 +7,20 @@ class AgencySetting(Base):
     __tablename__ = "agency_settings"
 
     id = Column(String(50), primary_key=True, default="default")
-    company_name = Column(String(255), nullable=False, default="Zarpou Viagens e Turismo Ltda")
-    trading_name = Column(String(255), nullable=False, default="Zarpou Viagens")
+    company_name = Column(String(255), nullable=False, default="Fly Promo")
+    trading_name = Column(String(255), nullable=False, default="Fly Promo")
     cnpj = Column(String(30), nullable=False, default="55.849.201/0001-38")
     cadastur = Column(String(30), nullable=False, default="34.120.948/0001-90")
     whatsapp = Column(String(30), nullable=False, default="5531984210000")
     whatsapp_message = Column(
         Text,
         nullable=True,
-        default="Olá! Gostaria de falar com um especialista da Zarpou Viagens."
+        default="Olá! Gostaria de falar com um especialista da Fly Promo."
     )
-    email = Column(String(255), nullable=False, default="contato@zarpou.com.br")
+    email = Column(String(255), nullable=False, default="")
     phone = Column(String(30), nullable=False, default="(31) 3344-5500")
-    instagram = Column(String(255), nullable=True, default="https://instagram.com/zarpouviagens")
-    linkedin = Column(String(255), nullable=True, default="https://linkedin.com/company/zarpouviagens")
+    instagram = Column(String(255), nullable=True)
+    linkedin = Column(String(255), nullable=True)
     address = Column(
         Text,
         nullable=True,
@@ -57,12 +57,12 @@ class AgencySetting(Base):
     ai_chat_system_prompt = Column(
         Text,
         nullable=True,
-        default="Você é o Concierge Virtual da Zarpou Viagens e Turismo. Atenda com calor humano, sofisticação e objetividade."
+        default="Você é o Concierge Virtual da Fly Promo. Atenda com calor humano, sofisticação e objetividade."
     )
     ai_chat_welcome_message = Column(
         Text,
         nullable=True,
-        default="Olá! Sou o Concierge Virtual da Zarpou Viagens. Como posso ajudar com sua próxima viagem hoje?"
+        default="Olá! Sou o Concierge Virtual da Fly Promo. Como posso ajudar com sua próxima viagem hoje?"
     )
 
     # Storage Bucket (AWS S3 / Supabase / R2)

@@ -20,7 +20,7 @@ def list_admin_users(
     current_user: User = Depends(require_screen("administradores")),
 ) -> Any:
     """
-    Lista todos os usuários administradores do sistema Zarpou.
+    Lista todos os usuários administradores do sistema Fly Promo.
     Apenas Administrador Geral.
     """
     service = UserService(db)

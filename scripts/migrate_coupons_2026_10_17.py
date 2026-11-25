@@ -1,5 +1,5 @@
 """
-Migração: criação da tabela de Cupons de Desconto (Zarpou).
+Migração: criação da tabela de Cupons de Desconto (Fly Promo).
 Data: 2026-10-17
 
 Cria a tabela 'coupons' (e seus índices) caso ela ainda não exista.

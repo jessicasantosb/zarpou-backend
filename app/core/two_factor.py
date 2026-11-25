@@ -149,17 +149,20 @@ def send_2fa_email_code(name: str, email: str, code: str) -> bool:
         print(f"[2FA DEV SIMULATION] Código para {email}: {code}")
         return True
 
+    if not settings.RESEND_FROM_EMAIL:
+        print("Configure RESEND_FROM_EMAIL para enviar códigos por e-mail.")
+        return False
     try:
         first_name = name.split()[0] if name else "Viajante"
         html_content = f"""
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 540px; margin: 0 auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff;">
           <div style="background-color: #003366; padding: 25px; text-align: center; border-radius: 14px;">
-            <h1 style="color: #ffffff; margin: 0; font-size: 20px; letter-spacing: 0.5px;">Zarpou Viagens e Turismo</h1>
+            <h1 style="color: #ffffff; margin: 0; font-size: 20px; letter-spacing: 0.5px;">Fly Promo</h1>
             <p style="color: #f7a01d; margin: 6px 0 0 0; font-size: 13px; font-weight: bold; text-transform: uppercase;">Código de Verificação de Segurança (2FA)</p>
           </div>
           <div style="padding: 30px 20px; color: #334155; line-height: 1.6;">
             <p style="font-size: 15px;">Olá, <strong>{first_name}</strong>!</p>
-            <p style="font-size: 14px; color: #64748b;">Recebemos uma solicitação de autenticação na sua conta Zarpou. Utilize o código de 6 dígitos abaixo para concluir o acesso:</p>
+            <p style="font-size: 14px; color: #64748b;">Recebemos uma solicitação de autenticação na sua conta Fly Promo. Utilize o código de 6 dígitos abaixo para concluir o acesso:</p>
             
             <div style="text-align: center; margin: 28px 0;">
               <span style="display: inline-block; background-color: #f8fafc; border: 2px dashed #003366; padding: 14px 28px; font-size: 32px; font-family: 'Courier New', monospace; font-weight: 900; letter-spacing: 8px; color: #003366; border-radius: 12px;">
@@ -171,8 +174,8 @@ def send_2fa_email_code(name: str, email: str, code: str) -> bool:
             
             <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
             <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">
-              Zarpou Viagens e Turismo Ltda • Cadastur: 34.120.948/0001-90<br />
-              Mensagem automática enviada pelo sistema de segurança Zarpou.
+              Fly Promo • Cadastur: 34.120.948/0001-90<br />
+              Mensagem automática enviada pelo sistema de segurança Fly Promo.
             </p>
           </div>
         </div>
@@ -185,9 +188,9 @@ def send_2fa_email_code(name: str, email: str, code: str) -> bool:
                     "Content-Type": "application/json",
                 },
                 json={
-                    "from": "Zarpou Segurança <lazer@zarpouviagens.com.br>",
+                    "from": f"Fly Promo <{settings.RESEND_FROM_EMAIL}>",
                     "to": [email],
-                    "subject": f"🔐 Seu código de segurança Zarpou: {code}",
+                    "subject": f"🔐 Seu código de segurança Fly Promo: {code}",
                     "html": html_content,
                 },
             )

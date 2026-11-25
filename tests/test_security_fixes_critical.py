@@ -22,7 +22,7 @@ from app.models.user import User
 
 client = TestClient(app)
 
-ADMIN_EMAIL = "admin@zarpou.com.br"
+ADMIN_EMAIL = "admin@example.com"
 ADMIN_PASSWORD = "admin123"
 TEAM_PASSWORD = "SenhaEquipe123"
 

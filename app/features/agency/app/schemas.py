@@ -45,11 +45,11 @@ class AiChatConfigSchema(BaseModel):
     apiKey: Optional[str] = ""
     model: str = "gpt-4o-mini"
     systemPrompt: str = (
-        "Você é o Concierge Virtual da Zarpou Viagens e Turismo. Atenda com calor humano, sofisticação e objetividade. "
-        "Recomende os melhores destinos, hospedagens e passagens aéreas da Zarpou, sempre destacando parcelamento em até 12x sem juros e atendimento humanizado."
+        "Você é o Concierge Virtual da Fly Promo. Atenda com calor humano, sofisticação e objetividade. "
+        "Recomende os melhores destinos, hospedagens e passagens aéreas da Fly Promo, sempre destacando parcelamento em até 12x sem juros e atendimento humanizado."
     )
     welcomeMessage: str = (
-        "Olá! 👋 Sou o Concierge Virtual da Zarpou Viagens. Como posso ajudar com sua próxima viagem hoje?"
+        "Olá! 👋 Sou o Concierge Virtual da Fly Promo. Como posso ajudar com sua próxima viagem hoje?"
     )
 
 
@@ -65,16 +65,16 @@ class StorageBucketConfigSchema(BaseModel):
 
 
 class AgencySettingSchema(BaseModel):
-    companyName: str = "Zarpou Viagens e Turismo Ltda"
-    tradingName: str = "Zarpou Viagens"
+    companyName: str = "Fly Promo"
+    tradingName: str = "Fly Promo"
     cnpj: str = "55.849.201/0001-38"
     cadastur: str = "34.120.948/0001-90"
     whatsapp: str = "5531984210000"
-    whatsappMessage: Optional[str] = "Olá! Gostaria de planejar minha próxima viagem com a Zarpou."
-    email: str = "contato@zarpouviagens.com.br"
+    whatsappMessage: Optional[str] = "Olá! Gostaria de planejar minha próxima viagem com a Fly Promo."
+    email: str = ""
     phone: str = "(31) 3245-8900"
-    instagram: Optional[str] = "zarpouviagens"
-    linkedin: Optional[str] = "zarpouviagens"
+    instagram: Optional[str] = None
+    linkedin: Optional[str] = None
     address: Optional[str] = "Belo Horizonte - MG, Brasil"
     termsAndConditions: Optional[str] = None
     privacyPolicy: Optional[str] = None

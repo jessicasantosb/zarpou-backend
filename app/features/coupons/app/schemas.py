@@ -7,7 +7,7 @@ CODE_PATTERN = re.compile(r"^[A-Z0-9_-]{3,50}$")
 
 
 class CouponBase(BaseModel):
-    code: str = Field(..., min_length=3, max_length=50, examples=["ZARPOU10"])
+    code: str = Field(..., min_length=3, max_length=50, examples=["FLYPROMO10"])
     description: Optional[str] = None
     discount_type: str = "percent"  # 'percent' | 'fixed'
     discount_value: float = Field(..., gt=0, examples=[10])
@@ -101,7 +101,7 @@ class CouponCodeResponse(BaseModel):
 class CouponValidateRequest(BaseModel):
     """Payload público de validação de cupom no checkout do cliente."""
 
-    code: str = Field(..., min_length=1, max_length=50, examples=["ZARPOU10"])
+    code: str = Field(..., min_length=1, max_length=50, examples=["FLYPROMO10"])
     order_amount: Optional[float] = Field(None, ge=0, examples=[1200.0])
     customer_email: Optional[str] = Field(None, max_length=255)
 

@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from pydantic import BaseModel, EmailStr, Field, AliasChoices
 
 
@@ -27,6 +27,21 @@ class TokenResponse(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+
+class AdminLoginChallengeResponse(BaseModel):
+    challenge: str
+    available_methods: List[Literal["email", "authenticator", "backup"]]
+    expires_at: int
+
+
+class AdminChallengeRequest(BaseModel):
+    challenge: str = Field(..., min_length=43, max_length=43)
+
+
+class AdminChallengeVerify(AdminChallengeRequest):
+    method: Literal["email", "authenticator", "backup"]
+    code: str = Field(..., min_length=1, max_length=64)
 
 
 class CustomerLoginRequest(BaseModel):
@@ -67,11 +82,20 @@ class CustomerChangePassword(BaseModel):
     newPassword: str
 
 
-class CustomerForgotPassword(BaseModel):
+class ForgotPasswordRequest(BaseModel):
     email: EmailStr
+
+
+class CustomerForgotPassword(ForgotPasswordRequest):
+    pass
 
 
 class CustomerResetPassword(BaseModel):
     token: str = Field(..., min_length=10)
     # Mesma regra do cadastro: senha nova com no mínimo 6 caracteres
     password: str = Field(..., min_length=6)
+
+
+class AdminResetPassword(BaseModel):
+    token: str = Field(..., min_length=43, max_length=43)
+    password: str = Field(..., min_length=8, max_length=72)

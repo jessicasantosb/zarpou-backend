@@ -31,7 +31,7 @@ def register_company(
     reg_in: CompanyRegisterRequest,
     db: Session = Depends(get_db)
 ) -> Any:
-    """Cadastro inicial de nova empresa conveniada para Zarpou Empresas (B2B)."""
+    """Cadastro inicial de nova empresa conveniada para Fly Promo Empresas (B2B)."""
     service = CompanyService(db)
     return service.register(reg_in)
 
@@ -110,7 +110,7 @@ def list_company_invoices(
 
 
 # ------------------------------------------------------------------------------
-# ENDPOINTS ADMINISTRATIVOS (BACKOFFICE ZARPOU)
+# ENDPOINTS ADMINISTRATIVOS (BACKOFFICE Fly Promo)
 # ------------------------------------------------------------------------------
 
 @router.get("/admin", response_model=List[CompanyResponse])
@@ -121,7 +121,7 @@ def list_all_companies(
     db: Session = Depends(get_db),
     admin: User = Depends(require_screen("usuarios")),
 ) -> Any:
-    """Listagem de todas as empresas conveniadas para análise pelo time da Zarpou (Requer Admin)."""
+    """Listagem de todas as empresas conveniadas para análise pelo time da Fly Promo (Requer Admin)."""
     service = CompanyService(db)
     return service.list_all_admin(status=status_filter, search=search)
 

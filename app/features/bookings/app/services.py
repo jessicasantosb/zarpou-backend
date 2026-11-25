@@ -168,7 +168,7 @@ class BookingService:
             if not target_company or target_company.status != "aprovada":
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Empresa não autorizada para faturamento a prazo ou cadastro pendente de aprovação pela Zarpou."
+                    detail="Empresa não autorizada para faturamento a prazo ou cadastro pendente de aprovação pela Fly Promo."
                 )
 
             disc_pct = float(target_company.corporate_discount_percent or 0.0)
@@ -206,7 +206,7 @@ class BookingService:
         pix_code = None
         pix_expires_at = None
         if booking_in.paymentMethod == "pix":
-            pix_code = f"00020126580014br.gov.bcb.pix0136{locator_code}-zarpou-pagamentos520400005303986540{final_amount:.2f}5802BR5922Zarpou Viagens Ltda6014Belo Horizonte62070503***6304"
+            pix_code = f"00020126580014br.gov.bcb.pix0136{locator_code}-fly-promo-pagamentos520400005303986540{final_amount:.2f}5802BR5909Fly Promo6014Belo Horizonte62070503***6304"
             pix_expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
 
         customer_id = customer.id if customer else None
@@ -314,7 +314,11 @@ class BookingService:
             if role in ("admin", "personalizado", "gestor", "atendente"):
                 from app.features.users.infra.models import User
                 user = self.db.query(User).filter(User.id == sub, User.is_active == True).first()
-                if user and (user.role == "admin" or "reservas" in user.allowedScreens):
+                if (
+                    user
+                    and user.accepts_session(payload)
+                    and (user.role == "admin" or "reservas" in user.allowedScreens)
+                ):
                     return True
             elif role == "company":
                 if booking.company_id and booking.company_id == sub:

@@ -1,5 +1,7 @@
 from sqlalchemy.orm import Session
 from typing import Optional
+from app.core.config import settings
+from app.core.branding import refresh_brand
 from app.features.agency.infra.repositories import SqlAlchemyAgencyRepository
 from app.features.agency.app.schemas import (
     AgencySettingSchema,
@@ -40,16 +42,16 @@ class AgencyService:
     def get_settings(self) -> AgencySettingSchema:
         setting = self.repository.get_or_create_settings()
         return AgencySettingSchema(
-            companyName=setting.company_name or "Zarpou Viagens e Turismo Ltda",
-            tradingName=setting.trading_name or "Zarpou Viagens",
+            companyName=setting.company_name or "Fly Promo",
+            tradingName=refresh_brand(setting.trading_name or "Fly Promo"),
             cnpj=setting.cnpj or "55.849.201/0001-38",
             cadastur=setting.cadastur or "34.120.948/0001-90",
             whatsapp=setting.whatsapp or "5531984210000",
-            whatsappMessage=setting.whatsapp_message or "Olá! Gostaria de planejar minha próxima viagem com a Zarpou.",
-            email=setting.email or "contato@zarpouviagens.com.br",
+            whatsappMessage=refresh_brand(setting.whatsapp_message or "Olá! Gostaria de planejar minha próxima viagem com a Fly Promo."),
+            email=settings.CONTACT_EMAIL or setting.email or "",
             phone=setting.phone or "(31) 3245-8900",
-            instagram=setting.instagram or "zarpouviagens",
-            linkedin=setting.linkedin or "zarpouviagens",
+            instagram=setting.instagram,
+            linkedin=setting.linkedin,
             address=setting.address or "Belo Horizonte - MG, Brasil",
             termsAndConditions=setting.terms_and_conditions,
             privacyPolicy=setting.privacy_policy,
@@ -80,8 +82,8 @@ class AgencyService:
                 provider=setting.ai_chat_provider or "openai",
                 apiKey=_mask_secret(setting.ai_chat_api_key),
                 model=setting.ai_chat_model or "gpt-4o-mini",
-                systemPrompt=setting.ai_chat_system_prompt or "Você é o Concierge Virtual da Zarpou Viagens e Turismo.",
-                welcomeMessage=setting.ai_chat_welcome_message or "Olá! 👋 Sou o Concierge Virtual da Zarpou Viagens. Como posso ajudar com sua próxima viagem hoje?",
+                systemPrompt=refresh_brand(setting.ai_chat_system_prompt or "Você é o Concierge Virtual da Fly Promo."),
+                welcomeMessage=refresh_brand(setting.ai_chat_welcome_message or "Olá! 👋 Sou o Concierge Virtual da Fly Promo. Como posso ajudar com sua próxima viagem hoje?"),
             ),
             storageBucket=StorageBucketConfigSchema(
                 provider=setting.storage_provider or "aws_s3",

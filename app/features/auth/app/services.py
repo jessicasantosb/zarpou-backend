@@ -2,7 +2,6 @@ from datetime import datetime, timezone, timedelta
 import hashlib
 import json
 import secrets
-import uuid
 from typing import Any, Optional, Dict
 from fastapi import HTTPException, status, BackgroundTasks
 import httpx
@@ -27,7 +26,9 @@ from app.core.two_factor import (
 import hmac
 from app.models.user import User
 from app.models.customer import Customer, CustomerPasswordResetToken
+from app.features.users.infra.models import AdminLoginChallenge, AdminPasswordResetToken
 from app.features.auth.app.schemas import (
+    AdminChallengeVerify,
     LoginRequest,
     CustomerLoginRequest,
     Customer2FaConfig,
@@ -50,21 +51,24 @@ def send_welcome_email_task(name: str, email: str) -> None:
     api_key = settings.RESEND_API_KEY
     if not api_key:
         return
+    if not settings.RESEND_FROM_EMAIL:
+        print("Configure RESEND_FROM_EMAIL para enviar e-mails.")
+        return
     try:
         first_name = name.split()[0] if name else "Viajante"
         html_content = f"""
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff;">
           <div style="background-color: #003366; padding: 25px; text-align: center; border-radius: 14px;">
-            <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Bem-vindo(a) à Zarpou Viagens! ✈️</h1>
+            <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Bem-vindo(a) à Fly Promo! ✈️</h1>
           </div>
           <div style="padding: 25px 15px; color: #334155; line-height: 1.6;">
             <p>Olá, <strong>{first_name}</strong>!</p>
-            <p>Sua conta na <strong>Zarpou Viagens e Turismo</strong> foi criada com sucesso com o e-mail <strong>{email}</strong>.</p>
+            <p>Sua conta na <strong>Fly Promo</strong> foi criada com sucesso com o e-mail <strong>{email}</strong>.</p>
             <p>Agora você tem acesso às melhores tarifas em hospedagens com até 12x sem juros, passagens aéreas e pacotes sob medida.</p>
             <div style="text-align: center; margin: 30px 0;">
-              <a href="https://www.zarpouviagens.com.br/minhas-viagens" style="background-color: #003366; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 12px; font-weight: bold; display: inline-block;">Acessar Minha Conta Zarpou →</a>
+              <a href="{settings.FRONTEND_URL.rstrip("/")}/minhas-viagens" style="background-color: #003366; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 12px; font-weight: bold; display: inline-block;">Acessar Minha Conta Fly Promo →</a>
             </div>
-            <p style="font-size: 12px; color: #64748b; margin-top: 25px;">Zarpou Viagens e Turismo Ltda • Cadastur: 34.120.948/0001-90</p>
+            <p style="font-size: 12px; color: #64748b; margin-top: 25px;">Fly Promo • Cadastur: 34.120.948/0001-90</p>
           </div>
         </div>
         """
@@ -76,9 +80,9 @@ def send_welcome_email_task(name: str, email: str) -> None:
                     "Content-Type": "application/json",
                 },
                 json={
-                    "from": "Zarpou Viagens <lazer@zarpouviagens.com.br>",
+                    "from": f"Fly Promo <{settings.RESEND_FROM_EMAIL}>",
                     "to": [email],
-                    "subject": f"🎉 Bem-vindo(a) à Zarpou Viagens, {first_name}! Sua conta foi criada",
+                    "subject": f"🎉 Bem-vindo(a) à Fly Promo, {first_name}! Sua conta foi criada",
                     "html": html_content,
                 },
             )
@@ -95,25 +99,28 @@ def send_password_reset_email(name: str, email: str, reset_url: str) -> None:
     if not api_key:
         print(f"[RECUPERAÇÃO DE SENHA - DEV SIMULATION] Link para {email}: {reset_url}")
         return
+    if not settings.RESEND_FROM_EMAIL:
+        print("Configure RESEND_FROM_EMAIL para enviar e-mails.")
+        return
     try:
         first_name = name.split()[0] if name else "Viajante"
         html_content = f"""
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff;">
           <div style="background-color: #003366; padding: 25px; text-align: center; border-radius: 14px;">
-            <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Zarpou Viagens e Turismo</h1>
+            <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Fly Promo</h1>
             <p style="color: #f7a01d; margin: 6px 0 0 0; font-size: 13px; font-weight: bold; text-transform: uppercase;">Recuperação de Senha</p>
           </div>
           <div style="padding: 30px 20px; color: #334155; line-height: 1.6;">
             <p style="font-size: 15px;">Olá, <strong>{first_name}</strong>!</p>
-            <p style="font-size: 14px; color: #64748b;">Recebemos uma solicitação para redefinir a senha da sua conta Zarpou (e-mail: <strong>{email}</strong>). Para criar uma nova senha, clique no botão abaixo:</p>
+            <p style="font-size: 14px; color: #64748b;">Recebemos uma solicitação para redefinir a senha da sua conta Fly Promo (e-mail: <strong>{email}</strong>). Para criar uma nova senha, clique no botão abaixo:</p>
             <div style="text-align: center; margin: 30px 0;">
               <a href="{reset_url}" style="background-color: #003366; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 12px; font-weight: bold; display: inline-block;">Redefinir minha senha →</a>
             </div>
             <p style="font-size: 12px; color: #64748b;">Este link é de uso único e válido por <strong>30 minutos</strong>. Se você não solicitou esta alteração, ignore este e-mail — sua senha permanecerá a mesma.</p>
             <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
             <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">
-              Zarpou Viagens e Turismo Ltda • Cadastur: 34.120.948/0001-90<br />
-              Mensagem automática enviada pelo sistema de segurança Zarpou.
+              Fly Promo • Cadastur: 34.120.948/0001-90<br />
+              Mensagem automática enviada pelo sistema de segurança Fly Promo.
             </p>
           </div>
         </div>
@@ -126,9 +133,9 @@ def send_password_reset_email(name: str, email: str, reset_url: str) -> None:
                     "Content-Type": "application/json",
                 },
                 json={
-                    "from": "Zarpou Viagens <lazer@zarpouviagens.com.br>",
+                    "from": f"Fly Promo <{settings.RESEND_FROM_EMAIL}>",
                     "to": [email],
-                    "subject": "🔒 Redefina sua senha da Zarpou Viagens",
+                    "subject": "🔒 Redefina sua senha da Fly Promo",
                     "html": html_content,
                 },
             )
@@ -140,25 +147,14 @@ class AuthService:
     def __init__(self, db: Session):
         self.db = db
 
-    def login_admin(self, login_data: LoginRequest) -> Dict[str, Any]:
+    def login_admin(self, login_data: LoginRequest, background_tasks: BackgroundTasks) -> Dict[str, Any]:
         email_clean = login_data.email.strip().lower()
-        user = self.db.query(User).filter(User.email == email_clean).first()
+        user = self.db.query(User).filter(User.email == email_clean).with_for_update().first()
 
-        # Se usuário admin não existe, verificar se é a credencial padrão inicial e criar
-        if not user and (email_clean in ["admin@zarpou.com.br", "admin"]) and login_data.password == "admin123":
-            user = User(
-                id="adm-1",
-                name="Administrador Zarpou",
-                email="admin@zarpou.com.br",
-                password_hash=get_password_hash("admin123"),
-                role="admin",
-                is_active=True
-            )
-            self.db.add(user)
-            self.db.commit()
-            self.db.refresh(user)
-
-        if not user or not verify_password(login_data.password, user.password_hash):
+        uses_demo_password = (
+            settings.ENVIRONMENT.strip().lower() == "production" and login_data.password == "admin123"
+        )
+        if uses_demo_password or not user or not verify_password(login_data.password, user.password_hash):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="E-mail ou senha incorretos."
@@ -170,8 +166,133 @@ class AuthService:
                 detail="Usuário inativo no sistema."
             )
 
-        access_token = create_access_token(subject=user.id, role=user.role)
-        refresh_token = create_refresh_token(subject=user.id, role=user.role)
+        if not user.two_factor_enabled:
+            return self._admin_session(user)
+
+        methods = self._admin_two_factor_methods(user)
+        if not methods:
+            raise HTTPException(status_code=503, detail="Nenhum método de verificação está disponível para esta conta.")
+
+        challenge = secrets.token_urlsafe(32)
+        now = datetime.now(timezone.utc)
+        expires_at = now + timedelta(minutes=10)
+        row = self.db.merge(AdminLoginChallenge(
+            user_id=user.id,
+            token_hash=hashlib.sha256(challenge.encode()).hexdigest(),
+            credential_fingerprint=self._admin_credential_fingerprint(user),
+            email_code_hash=None,
+            email_sent_at=None,
+            expires_at=expires_at,
+            attempts=0,
+        ))
+        if "email" in methods:
+            self._queue_admin_email_code(row, user, background_tasks, now)
+        self.db.commit()
+        return {"challenge": challenge, "available_methods": methods, "expires_at": int(expires_at.timestamp())}
+
+    @staticmethod
+    def _admin_two_factor_methods(user: User) -> list[str]:
+        methods = []
+        if user.two_factor_method in {"authenticator", "app", "both"} and user.twoFactorSecret:
+            methods.append("authenticator")
+        if user.two_factor_method in {"email", "both", None} and settings.resend_email_configured:
+            methods.append("email")
+        if user.backupCodes:
+            methods.append("backup")
+        return methods
+
+    @staticmethod
+    def _admin_credential_fingerprint(user: User) -> str:
+        credentials = json.dumps([
+            user.email, user.password_hash, user.session_version, user.two_factor_method,
+            user.two_factor_secret, user.two_factor_backup_codes,
+        ])
+        return hashlib.sha256(credentials.encode()).hexdigest()
+
+    @staticmethod
+    def _admin_email_code_hash(token_hash: str, code: str) -> str:
+        return hmac.new(settings.SECRET_KEY.encode(), f"admin-2fa:{token_hash}:{code}".encode(), hashlib.sha256).hexdigest()
+
+    def _queue_admin_email_code(
+        self, row: AdminLoginChallenge, user: User, background_tasks: BackgroundTasks, now: datetime,
+    ) -> None:
+        code = generate_email_code()
+        row.email_code_hash = self._admin_email_code_hash(row.token_hash, code)
+        row.email_sent_at = now
+        background_tasks.add_task(send_2fa_email_code, user.name, user.email, code)
+
+    def _get_admin_challenge(self, challenge: str) -> tuple[User, AdminLoginChallenge]:
+        invalid = HTTPException(status_code=400, detail="Verificação inválida ou expirada. Entre novamente.")
+        token_hash = hashlib.sha256(challenge.encode()).hexdigest()
+        owner = self.db.query(AdminLoginChallenge.user_id).filter(
+            AdminLoginChallenge.token_hash == token_hash,
+        ).first()
+        if owner is None:
+            raise invalid
+        # Password and challenge updates acquire the user lock before modifying the challenge.
+        user = self.db.query(User).filter_by(id=owner.user_id).with_for_update().first()
+        row = self.db.query(AdminLoginChallenge).filter(
+            AdminLoginChallenge.token_hash == token_hash,
+            AdminLoginChallenge.expires_at > datetime.now(timezone.utc),
+            AdminLoginChallenge.attempts < 5,
+        ).first()
+        if (user is None or not user.is_active or not user.two_factor_enabled or row is None
+                or row.credential_fingerprint != self._admin_credential_fingerprint(user)):
+            raise invalid
+        return user, row
+
+    def resend_admin_email_code(self, challenge: str, background_tasks: BackgroundTasks) -> Dict[str, Any]:
+        user, row = self._get_admin_challenge(challenge)
+        if "email" not in self._admin_two_factor_methods(user):
+            raise HTTPException(status_code=400, detail="Verificação por e-mail indisponível.")
+        now = datetime.now(timezone.utc)
+        sent_at = row.email_sent_at
+        if sent_at and not sent_at.tzinfo:
+            sent_at = sent_at.replace(tzinfo=timezone.utc)
+        if sent_at and sent_at > now - timedelta(minutes=1):
+            raise HTTPException(status_code=429, detail="Aguarde um minuto para reenviar o código.")
+        self._queue_admin_email_code(row, user, background_tasks, now)
+        self.db.commit()
+        return {"success": True}
+
+    def verify_admin_challenge(self, payload: AdminChallengeVerify) -> Dict[str, Any]:
+        user, row = self._get_admin_challenge(payload.challenge)
+        methods = self._admin_two_factor_methods(user)
+        code = payload.code.strip().upper()
+        valid = False
+        if payload.method == "email" and "email" in methods and row.email_code_hash:
+            valid = hmac.compare_digest(row.email_code_hash, self._admin_email_code_hash(row.token_hash, code))
+        elif payload.method == "authenticator" and "authenticator" in methods:
+            try:
+                valid = verify_totp_code(user.twoFactorSecret, code)
+            except ValueError:
+                valid = False
+        elif payload.method == "backup" and "backup" in methods:
+            backup = find_backup_code_match(code, user.backupCodes)
+            if backup:
+                user.two_factor_backup_codes = json.dumps([item for item in user.backupCodes if item != backup])
+                valid = True
+
+        if not valid:
+            row.attempts += 1
+            self.db.commit()
+            raise HTTPException(status_code=400, detail="Código de verificação inválido.")
+
+        consumed = self.db.query(AdminLoginChallenge).filter_by(token_hash=row.token_hash).delete()
+        if consumed != 1:
+            raise HTTPException(status_code=400, detail="Verificação inválida ou expirada. Entre novamente.")
+        session = self._admin_session(user, mfa_verified=True)
+        self.db.commit()
+        return session
+
+    @staticmethod
+    def _admin_session(user: User, mfa_verified: bool = False) -> Dict[str, Any]:
+        access_token = create_access_token(
+            subject=user.id, role=user.role, mfa_verified=mfa_verified, session_version=user.session_version,
+        )
+        refresh_token = create_refresh_token(
+            subject=user.id, role=user.role, mfa_verified=mfa_verified, session_version=user.session_version,
+        )
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
@@ -306,7 +427,6 @@ class AuthService:
             )
 
         customer = Customer(
-            id=f"cust-{int(datetime.now(timezone.utc).timestamp())}",
             name=customer_in.name,
             email=email_clean,
             phone=customer_in.phone,
@@ -568,6 +688,84 @@ class AuthService:
             "message": "Senha redefinida com sucesso! Você já pode entrar com a nova senha.",
         }
 
+    def forgot_admin_password(self, email: str, background_tasks: BackgroundTasks) -> Dict[str, Any]:
+        response = {
+            "success": True,
+            "message": "Se o e-mail estiver cadastrado, você receberá um link para redefinir sua senha.",
+        }
+        # The shared mailer prints links in development when Resend is unset.
+        if not settings.resend_email_configured:
+            return response
+
+        email_clean = email.strip().lower()
+        user = (
+            self.db.query(User)
+            .filter(User.email == email_clean, User.is_active.is_(True))
+            .with_for_update()
+            .first()
+        )
+        if user:
+            now = datetime.now(timezone.utc)
+            recent_request = self.db.query(AdminPasswordResetToken.user_id).filter(
+                AdminPasswordResetToken.user_id == user.id,
+                AdminPasswordResetToken.email == user.email,
+                AdminPasswordResetToken.session_version == user.session_version,
+                AdminPasswordResetToken.expires_at > now + timedelta(
+                    minutes=self.PASSWORD_RESET_TOKEN_EXPIRE_MINUTES - 1,
+                ),
+            ).first()
+            if recent_request:
+                return response
+
+            raw_token = secrets.token_urlsafe(32)
+            self.db.merge(AdminPasswordResetToken(
+                user_id=user.id,
+                email=user.email,
+                session_version=user.session_version,
+                token_hash=hashlib.sha256(raw_token.encode()).hexdigest(),
+                expires_at=now + timedelta(minutes=self.PASSWORD_RESET_TOKEN_EXPIRE_MINUTES),
+            ))
+            name, recipient = user.name, user.email
+            self.db.commit()
+            base = settings.FRONTEND_URL.rstrip("/")
+            background_tasks.add_task(
+                send_password_reset_email, name, recipient,
+                f"{base}/admin/redefinir-senha?token={raw_token}",
+            )
+
+        return response
+
+    def reset_admin_password(self, token: str, new_password: str) -> Dict[str, Any]:
+        if len(new_password.encode("utf-8")) > 72 or not new_password.strip():
+            raise HTTPException(status_code=400, detail="Informe uma senha válida de até 72 bytes.")
+        if settings.ENVIRONMENT.strip().lower() == "production" and new_password == "admin123":
+            raise HTTPException(status_code=400, detail="Escolha uma senha diferente da senha de demonstração.")
+
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        reset = self.db.query(AdminPasswordResetToken).filter_by(token_hash=token_hash)
+        row = reset.first()
+        invalid_link = HTTPException(
+            status_code=400, detail="Link de recuperação inválido ou expirado. Solicite um novo.",
+        )
+        if row is None:
+            raise invalid_link
+
+        # Use the same lock order as issuance. The conditional delete also
+        # prevents a stale request from consuming a newly issued token.
+        user = self.db.query(User).filter_by(id=row.user_id).with_for_update().first()
+        if user is None or not user.is_active or user.email != row.email or user.session_version != row.session_version:
+            raise invalid_link
+        consumed = reset.filter(
+            AdminPasswordResetToken.expires_at > datetime.now(timezone.utc),
+        ).delete(synchronize_session=False)
+        if consumed != 1:
+            raise invalid_link
+
+        user.password_hash = get_password_hash(new_password)
+        user.session_version += 1
+        self.db.commit()
+        return {"success": True, "message": "Senha redefinida com sucesso! Você já pode entrar com a nova senha."}
+
     def refresh_token(self, refresh_token_str: str) -> Dict[str, Any]:
         payload = decode_refresh_token(refresh_token_str)
         from app.core.token_revocation import is_token_revoked
@@ -576,6 +774,7 @@ class AuthService:
             payload.get("jti"),
             subject=payload.get("sub"),
             issued_at=payload.get("iat"),
+            issued_at_us=payload.get("issued_at_us"),
         ):
             payload = None
         if not payload:
@@ -594,13 +793,23 @@ class AuthService:
             )
 
         user_data = None
+        mfa_verified = False
+        session_version = None
         if role in ["admin", "personalizado", "gestor", "atendente"]:
-            user = self.db.query(User).filter(User.id == subject, User.is_active == True).first()
+            user = self.db.query(User).filter(User.id == subject, User.is_active.is_(True)).with_for_update().first()
             if not user:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Usuário associado ao token não encontrado ou inativo.",
                 )
+            mfa_verified = payload.get("mfa_verified") is True
+            if not user.accepts_session(payload) or is_token_revoked(
+                self.db, payload.get("jti"), subject=subject,
+                issued_at=payload.get("iat"), issued_at_us=payload.get("issued_at_us"),
+            ):
+                raise HTTPException(status_code=401, detail="Faça login novamente.")
+            session_version = user.session_version
+            role = user.role
             user_data = {
                 "id": user.id,
                 "name": user.name,
@@ -640,8 +849,12 @@ class AuthService:
                 "twoFactorEnabled": cust.twoFactorEnabled,
             }
 
-        new_access_token = create_access_token(subject=subject, role=role)
-        new_refresh_token = create_refresh_token(subject=subject, role=role)
+        new_access_token = create_access_token(
+            subject=subject, role=role, mfa_verified=mfa_verified, session_version=session_version,
+        )
+        new_refresh_token = create_refresh_token(
+            subject=subject, role=role, mfa_verified=mfa_verified, session_version=session_version,
+        )
         return {
             "access_token": new_access_token,
             "refresh_token": new_refresh_token,

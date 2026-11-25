@@ -1,5 +1,5 @@
 """
-Instância Celery do Zarpou Backend.
+Instância Celery do Fly Promo Backend.
 
 Usada para tarefas assíncronas de longa duração (ex.: importação em massa de
 catálogo a partir de CSV/Excel) que não podem rodar no ciclo da requisição
@@ -23,7 +23,7 @@ _broker = settings.CELERY_BROKER_URL or settings.REDIS_URL
 _backend = settings.CELERY_RESULT_BACKEND or settings.REDIS_URL
 
 celery_app = Celery(
-    "zarpou",
+    "fly_promo",
     broker=_broker,
     backend=_backend,
     include=["app.features.imports.app.tasks"],

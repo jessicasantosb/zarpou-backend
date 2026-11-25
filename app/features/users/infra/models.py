@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 import json
 import uuid
-from typing import List
-from sqlalchemy import Column, String, Boolean, DateTime, Text
+from typing import List, Optional
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, Text
 from app.core.database import Base
 
 ALL_ADMIN_SCREENS = [
@@ -20,6 +20,28 @@ ALL_ADMIN_SCREENS = [
 ]
 
 
+class AdminPasswordResetToken(Base):
+    __tablename__ = "admin_password_reset_tokens"
+
+    user_id = Column(String(36), primary_key=True)
+    email = Column(String(255), nullable=False)
+    session_version = Column(Integer, nullable=False)
+    token_hash = Column(String(64), nullable=False, unique=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+
+
+class AdminLoginChallenge(Base):
+    __tablename__ = "admin_login_challenges"
+
+    user_id = Column(String(36), primary_key=True)
+    token_hash = Column(String(64), nullable=False, unique=True)
+    credential_fingerprint = Column(String(64), nullable=False)
+    email_code_hash = Column(String(64), nullable=True)
+    email_sent_at = Column(DateTime(timezone=True), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    attempts = Column(Integer, nullable=False)
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -30,6 +52,7 @@ class User(Base):
     role = Column(String(50), nullable=False, default="admin")
     allowed_screens_raw = Column("allowed_screens", Text, nullable=True, default="[]")
     is_active = Column(Boolean, nullable=False, default=True)
+    session_version = Column(Integer, nullable=False, default=0, server_default="0")
     two_factor_enabled = Column(Boolean, nullable=False, default=False)
     two_factor_method = Column(String(20), nullable=True, default="email")
     two_factor_secret = Column(String(255), nullable=True)  # cifrado em repouso (Fernet, prefixo 'enc:')
@@ -44,6 +67,13 @@ class User(Base):
     @property
     def twoFactorEnabled(self) -> bool:
         return bool(self.two_factor_enabled)
+
+    def accepts_session(self, payload: dict) -> bool:
+        return (
+            self.is_active
+            and self.session_version == payload.get("session_version", 0)
+            and (not self.two_factor_enabled or payload.get("mfa_verified") is True)
+        )
 
     @property
     def twoFactorMethod(self) -> Optional[str]:

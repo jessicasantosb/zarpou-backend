@@ -5,14 +5,19 @@ from app.api.deps import (
     get_db,
     get_current_admin_user,
     get_current_customer_user,
+    get_current_user_payload,
     get_optional_customer_user,
     oauth2_scheme,
 )
 from app.core.limiter import limiter
-from app.core.token_revocation import revoke_token
+from app.core.config import settings
+from app.core.token_revocation import is_token_revoked, revoke_token
 from app.models.user import User
 from app.models.customer import Customer
 from app.features.auth.app.schemas import (
+    AdminChallengeRequest,
+    AdminChallengeVerify,
+    AdminLoginChallengeResponse,
     LoginRequest,
     CustomerLoginRequest,
     Token,
@@ -26,6 +31,8 @@ from app.features.auth.app.schemas import (
     CustomerChangePassword,
     CustomerForgotPassword,
     CustomerResetPassword,
+    AdminResetPassword,
+    ForgotPasswordRequest,
 )
 from app.features.customers.app.schemas import CustomerCreate, CustomerResponse
 from app.features.auth.app.services import AuthService
@@ -33,19 +40,30 @@ from app.features.auth.app.services import AuthService
 router = APIRouter()
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login", response_model=Token | AdminLoginChallengeResponse)
 @limiter.limit("5/minute")
 def login_admin(
     request: Request,
     login_data: LoginRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ) -> Any:
-    """
-    Login de administrador da Zarpou Viagens.
-    Compatível com os dados do auth-store.ts do frontend (admin@zarpou.com.br / admin123).
-    """
-    service = AuthService(db)
-    return service.login_admin(login_data)
+    return AuthService(db).login_admin(login_data, background_tasks)
+
+
+@router.post("/admin/2fa/verify", response_model=Token)
+@limiter.limit("5/minute")
+def verify_admin_challenge(request: Request, payload: AdminChallengeVerify, db: Session = Depends(get_db)) -> Any:
+    return AuthService(db).verify_admin_challenge(payload)
+
+
+@router.post("/admin/2fa/resend")
+@limiter.limit("3/minute")
+def resend_admin_email_code(
+    request: Request, payload: AdminChallengeRequest, background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+) -> Any:
+    return AuthService(db).resend_admin_email_code(payload.challenge, background_tasks)
 
 
 @router.post("/customer/login", response_model=Token)
@@ -142,30 +160,58 @@ def update_admin_2fa(
     payload: dict,
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user),
+    session: dict = Depends(get_current_user_payload),
 ) -> Any:
     """
     Atualiza as configurações de 2FA do administrador logado.
     O segredo TOTP é cifrado em repouso (Fernet) e nunca devolvido na resposta.
     """
     import json
-    from app.core.two_factor import encrypt_totp_secret
+    from app.core.two_factor import encrypt_totp_secret, generate_totp_code, hash_backup_code
+
+    admin = db.query(User).filter_by(id=admin.id).populate_existing().with_for_update().first()
+    if admin is None or not admin.accepts_session(session) or is_token_revoked(
+        db, session.get("jti"), subject=session.get("sub"),
+        issued_at=session.get("iat"), issued_at_us=session.get("issued_at_us"),
+    ):
+        raise HTTPException(status_code=401, detail="Faça login novamente.")
 
     enabled = payload.get("enabled", False)
     method = payload.get("method")
     secret = payload.get("secret")
     backup_codes = payload.get("backupCodes") or payload.get("backup_codes")
 
+    if not isinstance(enabled, bool) or (secret is not None and not isinstance(secret, str)):
+        raise HTTPException(status_code=400, detail="Configuração de verificação inválida.")
+    if enabled:
+        method = method or admin.two_factor_method or "email"
+        if not isinstance(method, str) or method not in {"authenticator", "app", "email", "both"}:
+            raise HTTPException(status_code=400, detail="Método de verificação inválido.")
+        if method in {"authenticator", "app", "both"}:
+            totp_secret = secret or admin.twoFactorSecret
+            if not totp_secret or not 16 <= len(totp_secret.strip()) <= 64:
+                raise HTTPException(status_code=400, detail="Configure o aplicativo autenticador antes de ativar a verificação.")
+            try:
+                generate_totp_code(totp_secret)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Chave do aplicativo autenticador inválida.") from None
+        if method == "email" and not settings.resend_email_configured:
+            raise HTTPException(status_code=503, detail="O envio de códigos por e-mail está indisponível.")
+
     admin.two_factor_enabled = enabled
-    if method:
+    if enabled:
         admin.two_factor_method = method
-    if secret:
-        admin.two_factor_secret = encrypt_totp_secret(secret)
-    if backup_codes:
-        admin.two_factor_backup_codes = json.dumps(backup_codes) if isinstance(backup_codes, list) else str(backup_codes)
-    elif not enabled:
+        if secret and method in {"authenticator", "app", "both"}:
+            admin.two_factor_secret = encrypt_totp_secret(secret)
+    if not enabled:
         admin.two_factor_secret = None
         admin.two_factor_backup_codes = None
+    elif backup_codes:
+        if not isinstance(backup_codes, list) or not all(isinstance(code, str) for code in backup_codes):
+            raise HTTPException(status_code=400, detail="Códigos de recuperação inválidos.")
+        admin.two_factor_backup_codes = json.dumps([hash_backup_code(code) for code in backup_codes])
 
+    admin.session_version += 1
     db.commit()
     db.refresh(admin)
     return {
@@ -254,6 +300,27 @@ def change_customer_password(
     """
     service = AuthService(db)
     return service.change_password(customer, pwd_data)
+
+
+@router.post("/admin/password/forgot")
+@limiter.limit("5/hour")
+def forgot_admin_password(
+    request: Request,
+    payload: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+) -> Any:
+    return AuthService(db).forgot_admin_password(payload.email, background_tasks)
+
+
+@router.post("/admin/password/reset")
+@limiter.limit("10/hour")
+def reset_admin_password(
+    request: Request,
+    payload: AdminResetPassword,
+    db: Session = Depends(get_db),
+) -> Any:
+    return AuthService(db).reset_admin_password(payload.token, payload.password)
 
 
 @router.post("/customer/password/forgot")

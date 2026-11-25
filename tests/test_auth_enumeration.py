@@ -21,7 +21,7 @@ client = TestClient(app)
 
 LOGIN_URL = "/api/v1/auth/customer/login"
 REGISTER_URL = "/api/v1/auth/customer/register"
-ADMIN_EMAIL = "admin@zarpou.com.br"
+ADMIN_EMAIL = "admin@example.com"
 
 
 def _register_customer() -> str:

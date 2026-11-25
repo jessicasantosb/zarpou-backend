@@ -51,7 +51,7 @@ def send_coupon_notifications_task(
         from app.features.agency.infra.models import AgencySetting
         agency = db.query(AgencySetting).filter(AgencySetting.id == "default").first()
 
-        site_link = f"https://www.zarpouviagens.com.br/?cupom={code}"
+        site_link = f"{settings.FRONTEND_URL.rstrip('/')}/?cupom={code}"
         if discount_type == "percent":
             discount_label = f"{discount_value:g}% de desconto"
         else:
@@ -65,7 +65,7 @@ def send_coupon_notifications_task(
                 validity_line = f"Válido até {valid_to}"
 
         api_key = (agency.resend_api_key if agency and agency.resend_api_key else None) or settings.RESEND_API_KEY
-        if api_key and email_customers:
+        if api_key and settings.RESEND_FROM_EMAIL and email_customers:
             try:
                 for customer in email_customers:
                     first_name = customer.name.split()[0] if customer.name else "Viajante"
@@ -82,7 +82,7 @@ def send_coupon_notifications_task(
                       </div>
                       <div style="padding: 24px 12px; color: #334155; line-height: 1.6;">
                         <p>Olá, <strong>{first_name}</strong>!</p>
-                        <p>A Zarpou Viagens preparou um cupom de desconto exclusivo para a sua próxima viagem:</p>
+                        <p>A Fly Promo preparou um cupom de desconto exclusivo para a sua próxima viagem:</p>
                         {description_block}
                         <div style="text-align: center; margin: 24px 0;">
                           <span style="display: inline-block; font-family: 'Courier New', monospace; font-size: 28px; font-weight: 800; letter-spacing: 6px; color: #003366; background-color: #f8fafc; border: 2px dashed #ebb343; border-radius: 12px; padding: 16px 28px;">{code}</span>
@@ -90,11 +90,11 @@ def send_coupon_notifications_task(
                           <p style="font-size: 12px; color: #94a3b8; margin: 4px 0 0 0;">{validity_line}</p>
                         </div>
                         <div style="text-align: center; margin: 28px 0;">
-                          <a href="{site_link}" style="background-color: #003366; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 12px; font-weight: bold; font-size: 15px; display: inline-block;">Usar cupom na Zarpou →</a>
+                          <a href="{site_link}" style="background-color: #003366; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 12px; font-weight: bold; font-size: 15px; display: inline-block;">Usar cupom na Fly Promo →</a>
                         </div>
                         <p style="font-size: 11px; color: #94a3b8; margin-top: 30px; text-align: center;">
-                          Você está recebendo este e-mail porque se cadastrou na Zarpou Viagens e aceitou receber novidades e promoções.
-                          Para alterar suas preferências, acesse <a href="https://www.zarpouviagens.com.br/minhas-viagens?tab=perfil" style="color: #003366;">Meu Perfil</a>.
+                          Você está recebendo este e-mail porque se cadastrou na Fly Promo e aceitou receber novidades e promoções.
+                          Para alterar suas preferências, acesse <a href="{settings.FRONTEND_URL.rstrip('/')}/minhas-viagens?tab=perfil" style="color: #003366;">Meu Perfil</a>.
                         </p>
                       </div>
                     </div>
@@ -107,14 +107,14 @@ def send_coupon_notifications_task(
                                 "Content-Type": "application/json",
                             },
                             json={
-                                "from": "Zarpou Viagens <ofertas@zarpouviagens.com.br>",
+                                "from": f"Fly Promo <{settings.RESEND_FROM_EMAIL}>",
                                 "to": [customer.email],
-                                "subject": f"🎟️ Cupom {code} liberado: {discount_label} na Zarpou",
+                                "subject": f"🎟️ Cupom {code} liberado: {discount_label} na Fly Promo",
                                 "html": html_content,
                             },
                         )
             except Exception as email_err:
-                print(f"[Zarpou Coupon Email Error]: {email_err}")
+                print(f"[Fly Promo Coupon Email Error]: {email_err}")
 
         if whatsapp_customers:
             wa_enabled = bool(agency and agency.whatsapp_api_enabled)
@@ -128,13 +128,13 @@ def send_coupon_notifications_task(
                     clean_phone = f"55{clean_phone}"
                 first_name = customer.name.split()[0] if customer.name else "Viajante"
                 wa_msg = (
-                    f"🎟️ *ZARPOU VIAGENS | CUPOM EXCLUSIVO*\n\n"
+                    f"🎟️ *Fly Promo | CUPOM EXCLUSIVO*\n\n"
                     f"Olá {first_name}! Liberamos um cupom de desconto só para você:\n\n"
                     f"🔑 *Código:* `{code}`\n"
                     f"🏷️ *Benefício:* {discount_label}\n"
                     f"📅 {validity_line}\n\n"
                     f"👉 Use o código na tela de pagamento:\n{site_link}\n\n"
-                    f"_Para gerenciar preferências de mensagens, acesse seu perfil no site da Zarpou._"
+                    f"_Para gerenciar preferências de mensagens, acesse seu perfil no site da Fly Promo._"
                 )
 
                 if wa_enabled and wa_token and wa_phone_id:
@@ -159,14 +159,14 @@ def send_coupon_notifications_task(
                             if res.status_code not in [200, 201]:
                                 print(f"[WhatsApp Meta API Error {res.status_code}]: {res.text}")
                     except Exception as wa_err:
-                        print(f"[Zarpou Coupon WA Error]: {wa_err}")
+                        print(f"[Fly Promo Coupon WA Error]: {wa_err}")
                 elif wa_enabled and wa_token and not wa_phone_id:
                     print(f"[WhatsApp Trigger] API WhatsApp está ativa, mas falta preencher o 'ID do Número de Telefone' em /admin/configuracoes. Simulação para {customer.name} ({clean_phone}).")
                 else:
                     print(f"[WhatsApp Trigger] API do WhatsApp está DESATIVADA no painel (/admin/configuracoes). Para envio real, ative a chave 'API Ativa' e insira as credenciais da Meta/Evolution. Simulação para {customer.name} ({clean_phone}): cupom {code}")
 
         print(
-            f"[Zarpou Coupon Trigger] Concluído: Cupom '{code}' ({coupon_id}) processado para "
+            f"[Fly Promo Coupon Trigger] Concluído: Cupom '{code}' ({coupon_id}) processado para "
             f"{len(email_customers)} clientes por e-mail e {len(whatsapp_customers)} por WhatsApp."
         )
     finally:

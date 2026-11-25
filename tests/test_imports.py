@@ -46,7 +46,7 @@ def _admin_headers():
     try:
         from app.models.user import User
 
-        admin = db.query(User).filter(User.email == "admin@zarpou.com.br").first()
+        admin = db.query(User).filter(User.email == "admin@example.com").first()
         assert admin is not None
         return {"Authorization": f"Bearer {create_access_token(subject=admin.id, role=admin.role)}"}
     finally:

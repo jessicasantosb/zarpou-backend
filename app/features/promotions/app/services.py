@@ -50,12 +50,12 @@ def send_promotion_notifications_task(
         from app.features.agency.infra.models import AgencySetting
         agency = db.query(AgencySetting).filter(AgencySetting.id == "default").first()
 
-        full_link = f"https://www.zarpouviagens.com.br{link}" if link.startswith("/") else link
+        full_link = f"{settings.FRONTEND_URL.rstrip('/')}{link}" if link.startswith("/") else link
         badge_text = badge or "OFERTA EXCLUSIVA"
         discount = discount_text or "Descontos Especiais"
 
         api_key = (agency.resend_api_key if agency and agency.resend_api_key else None) or settings.RESEND_API_KEY
-        if api_key and email_customers:
+        if api_key and settings.RESEND_FROM_EMAIL and email_customers:
             try:
                 for customer in email_customers:
                     first_name = customer.name.split()[0] if customer.name else "Viajante"
@@ -68,14 +68,14 @@ def send_promotion_notifications_task(
                       </div>
                       <div style="padding: 24px 12px; color: #334155; line-height: 1.6;">
                         <p>Olá, <strong>{first_name}</strong>!</p>
-                        <p>A Zarpou Viagens preparou uma nova oferta imperdível para sua próxima viagem:</p>
+                        <p>A Fly Promo preparou uma nova oferta imperdível para sua próxima viagem:</p>
                         {f'<p style="background: #f8fafc; padding: 14px; border-left: 4px solid #003366; border-radius: 8px; font-style: italic;">{subtitle}</p>' if subtitle else ''}
                         <div style="text-align: center; margin: 28px 0;">
-                          <a href="{full_link}" style="background-color: #003366; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 12px; font-weight: bold; font-size: 15px; display: inline-block;">Ver Oferta na Zarpou →</a>
+                          <a href="{full_link}" style="background-color: #003366; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 12px; font-weight: bold; font-size: 15px; display: inline-block;">Ver Oferta na Fly Promo →</a>
                         </div>
                         <p style="font-size: 11px; color: #94a3b8; margin-top: 30px; text-align: center;">
-                          Você está recebendo este e-mail porque se cadastrou na Zarpou Viagens e aceitou receber novidades e promoções.
-                          Para alterar suas preferências, acesse <a href="https://www.zarpouviagens.com.br/minhas-viagens?tab=perfil" style="color: #003366;">Meu Perfil</a>.
+                          Você está recebendo este e-mail porque se cadastrou na Fly Promo e aceitou receber novidades e promoções.
+                          Para alterar suas preferências, acesse <a href="{settings.FRONTEND_URL.rstrip('/')}/minhas-viagens?tab=perfil" style="color: #003366;">Meu Perfil</a>.
                         </p>
                       </div>
                     </div>
@@ -88,14 +88,14 @@ def send_promotion_notifications_task(
                                 "Content-Type": "application/json",
                             },
                             json={
-                                "from": "Zarpou Viagens <ofertas@zarpouviagens.com.br>",
+                                "from": f"Fly Promo <{settings.RESEND_FROM_EMAIL}>",
                                 "to": [customer.email],
-                                "subject": f"✈️ Nova Oferta Zarpou: {title} ({discount})",
+                                "subject": f"✈️ Nova Oferta Fly Promo: {title} ({discount})",
                                 "html": html_content,
                             },
                         )
             except Exception as email_err:
-                print(f"[Zarpou Promo Email Error]: {email_err}")
+                print(f"[Fly Promo Promo Email Error]: {email_err}")
 
         if whatsapp_customers:
             wa_enabled = bool(agency and agency.whatsapp_api_enabled)
@@ -109,12 +109,12 @@ def send_promotion_notifications_task(
                     clean_phone = f"55{clean_phone}"
                 first_name = customer.name.split()[0] if customer.name else "Viajante"
                 wa_msg = (
-                    f"✈️ *ZARPOU VIAGENS | {badge_text}*\n\n"
+                    f"✈️ *Fly Promo | {badge_text}*\n\n"
                     f"Olá {first_name}! Uma nova promoção exclusiva acaba de ser lançada:\n\n"
                     f"🔥 *{title}*\n"
                     f"🏷️ *Desconto:* {discount}\n\n"
                     f"👉 Aproveite agora no link:\n{full_link}\n\n"
-                    f"_Para gerenciar preferências de mensagens, acesse seu perfil no site da Zarpou._"
+                    f"_Para gerenciar preferências de mensagens, acesse seu perfil no site da Fly Promo._"
                 )
 
                 if wa_enabled and wa_token and wa_phone_id:
@@ -139,14 +139,14 @@ def send_promotion_notifications_task(
                             if res.status_code not in [200, 201]:
                                 print(f"[WhatsApp Meta API Error {res.status_code}]: {res.text}")
                     except Exception as wa_err:
-                        print(f"[Zarpou Promo WA Error]: {wa_err}")
+                        print(f"[Fly Promo Promo WA Error]: {wa_err}")
                 elif wa_enabled and wa_token and not wa_phone_id:
                     print(f"[WhatsApp Trigger] API WhatsApp está ativa, mas falta preencher o 'ID do Número de Telefone' em /admin/configuracoes. Simulação para {customer.name} ({clean_phone}).")
                 else:
                     print(f"[WhatsApp Trigger] API do WhatsApp está DESATIVADA no painel (/admin/configuracoes). Para envio real, ative a chave 'API Ativa' e insira as credenciais da Meta/Evolution. Simulação para {customer.name} ({clean_phone}): {title}")
 
         print(
-            f"[Zarpou Promotion Trigger] Concluído: Promoção '{title}' ({promo_id}) processada para "
+            f"[Fly Promo Promotion Trigger] Concluído: Promoção '{title}' ({promo_id}) processada para "
             f"{len(email_customers)} clientes por e-mail e {len(whatsapp_customers)} por WhatsApp."
         )
     finally:

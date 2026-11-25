@@ -3,6 +3,7 @@ from typing import List, Optional, Dict, Any
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.security import get_password_hash
+from app.core.config import settings
 from app.features.customers.infra.models import Customer
 from app.features.customers.infra.repositories import SqlAlchemyCustomerRepository
 from app.features.customers.app.schemas import (
@@ -129,7 +130,6 @@ class CustomerService:
             )
 
         customer = Customer(
-            id=f"cust-{int(datetime.now(timezone.utc).timestamp())}",
             name=customer_in.name.strip(),
             email=email_clean,
             phone=customer_in.phone.strip() if customer_in.phone else None,
@@ -251,8 +251,8 @@ class CustomerService:
         return {
             "exportedAt": datetime.now(timezone.utc).isoformat(),
             "controller": {
-                "name": "Zarpou Viagens e Turismo Ltda",
-                "contact": "privacidade@zarpouviagens.com.br",
+                "name": "Fly Promo",
+                "contact": settings.PRIVACY_EMAIL or settings.CONTACT_EMAIL,
             },
             "profile": {
                 "id": customer.id,

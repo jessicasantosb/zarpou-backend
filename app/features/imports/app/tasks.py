@@ -1,4 +1,4 @@
-"""Tasks Celery do Zarpou Backend (executadas pelo worker: celery -A app.core.celery_app.celery_app worker)."""
+"""Tasks Celery do Fly Promo Backend (executadas pelo worker: celery -A app.core.celery_app.celery_app worker)."""
 from app.core.celery_app import celery_app
 
 

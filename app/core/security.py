@@ -24,21 +24,27 @@ def get_password_hash(password: str) -> str:
 def create_access_token(
     subject: Union[str, Any],
     role: str = "customer",
-    expires_delta: Optional[timedelta] = None
+    expires_delta: Optional[timedelta] = None,
+    *,
+    mfa_verified: bool = False,
+    session_version: Optional[int] = None,
 ) -> str:
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    now = datetime.now(timezone.utc)
+    expire = now + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
     
     to_encode = {
         "exp": expire,
-        "iat": int(datetime.now(timezone.utc).timestamp()),
+        "iat": int(now.timestamp()),
+        "issued_at_us": int(now.timestamp() * 1_000_000),
         "sub": str(subject),
         "role": role,
         "type": "access",
         "jti": uuid.uuid4().hex,
     }
+    if mfa_verified:
+        to_encode["mfa_verified"] = True
+    if session_version is not None:
+        to_encode["session_version"] = session_version
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
@@ -62,21 +68,27 @@ def decode_access_token(token: str) -> Optional[dict]:
 def create_refresh_token(
     subject: Union[str, Any],
     role: str = "customer",
-    expires_delta: Optional[timedelta] = None
+    expires_delta: Optional[timedelta] = None,
+    *,
+    mfa_verified: bool = False,
+    session_version: Optional[int] = None,
 ) -> str:
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    now = datetime.now(timezone.utc)
+    expire = now + (expires_delta or timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS))
 
     to_encode = {
         "exp": expire,
-        "iat": int(datetime.now(timezone.utc).timestamp()),
+        "iat": int(now.timestamp()),
+        "issued_at_us": int(now.timestamp() * 1_000_000),
         "sub": str(subject),
         "role": role,
         "type": "refresh",
         "jti": uuid.uuid4().hex,
     }
+    if mfa_verified:
+        to_encode["mfa_verified"] = True
+    if session_version is not None:
+        to_encode["session_version"] = session_version
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 

@@ -3,6 +3,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.branding import refresh_brand
 from app.features.agency.infra.models import AgencySetting
 from app.features.chat.infra.models import ChatLog
 from app.features.chat.infra.repositories import ChatLogRepository
@@ -34,13 +35,13 @@ class ChatService:
         )
         provider = (req.config and req.config.provider) or (agency_cfg and agency_cfg.ai_chat_provider) or "openai"
         model = (req.config and req.config.model) or (agency_cfg and agency_cfg.ai_chat_model) or "gpt-4o-mini"
-        system_prompt = (
+        system_prompt = refresh_brand(
             (req.config and req.config.systemPrompt)
             or (agency_cfg and agency_cfg.ai_chat_system_prompt)
             or (
-                "Você é o Concierge Virtual da Zarpou Viagens e Turismo. Atenda com calor humano, sofisticação e objetividade. "
-                "Recomende os melhores destinos, hospedagens e passagens aéreas da Zarpou, sempre destacando parcelamento em até 12x sem juros e atendimento humanizado.\n"
-                "REGRAS DE NAVEGAÇÃO: Ao citar links internos no site, utilize EXCLUSIVAMENTE as seguintes rotas reais da Zarpou:\n"
+                "Você é o Concierge Virtual da Fly Promo. Atenda com calor humano, sofisticação e objetividade. "
+                "Recomende os melhores destinos, hospedagens e passagens aéreas da Fly Promo, sempre destacando parcelamento em até 12x sem juros e atendimento humanizado.\n"
+                "REGRAS DE NAVEGAÇÃO: Ao citar links internos no site, utilize EXCLUSIVAMENTE as seguintes rotas reais da Fly Promo:\n"
                 "- Hospedagens / Hotéis: /hospedagens (nunca utilize /hoteis)\n"
                 "- Passagens Aéreas / Voos: /passagens (nunca utilize /voos)\n"
                 "- Pacotes Turísticos: /pacotes\n"
@@ -146,7 +147,7 @@ class ChatService:
         lower = req.message.lower()
         if any(k in lower for k in ["hotel", "hoté", "hotei", "hosped", "resort", "pousad", "estadia", "quarto"]):
             reply = (
-                "🏨 **Hospedagens em Destaque na Zarpou:**\n\n"
+                "🏨 **Hospedagens em Destaque na Fly Promo:**\n\n"
                 "Temos uma curadoria exclusiva com cancelamento grátis e café da manhã incluso:\n\n"
                 "1. **Copacabana Palace Grand Luxury (Rio de Janeiro)** — 5 estrelas em frente ao mar, a partir de **R$ 850/noite**.\n"
                 "2. **Búzios Beach & Spa Resort (Armação dos Búzios)** — Piscina aquecida e alta gastronomia por **R$ 520/noite**.\n"
@@ -162,7 +163,7 @@ class ChatService:
         elif any(k in lower for k in ["voo", "passag", "aéreo", "aereo"]):
             reply = (
                 "✈️ **Tarifas Aéreas Internacionais em Promoção:**\n\n"
-                "A Zarpou negociou tarifas especiais com taxas de embarque inclusas:\n\n"
+                "A Fly Promo negociou tarifas especiais com taxas de embarque inclusas:\n\n"
                 "• **Belo Horizonte (CNF) ⇄ Miami (MIA)**: Ida e volta a partir de **R$ 3.450** (12x de R$ 287,50).\n"
                 "• **São Paulo (GRU) ⇄ Roma (FCO)**: Voo direto ITA Airways por **R$ 4.890** (12x de R$ 407,50).\n"
                 "• **Belo Horizonte (CNF) ⇄ Madri (MAD)**: Iberia com bagagem inclusa por **R$ 4.350**.\n"
@@ -176,7 +177,7 @@ class ChatService:
             ]
         elif any(k in lower for k in ["pacote", "promoç", "promoc", "oferta", "desconto"]):
             reply = (
-                "🌴 **Pacotes & Promoções Especiais Zarpou:**\n\n"
+                "🌴 **Pacotes & Promoções Especiais Fly Promo:**\n\n"
                 "Combinando voo + hospedagem você economiza até **25%** no valor final da viagem!\n\n"
                 "• **Semana Santa & Feriados**: Pacotes para o Nordeste e praias paradisíacas com pensão completa.\n"
                 "• **Destinos Andinos**: Roteiros para o Chile e Argentina com vinhedos inclusos.\n"
@@ -189,7 +190,7 @@ class ChatService:
             ]
         elif any(k in lower for k in ["humano", "atendente", "whatsapp", "contato", "telefone"]):
             reply = (
-                "💬 **Atendimento Humanizado Zarpou:**\n\n"
+                "💬 **Atendimento Humanizado Fly Promo:**\n\n"
                 "Nossos consultores especialistas estão prontos para atender você no WhatsApp oficial da agência!\n\n"
                 f"Basta clicar no botão abaixo ou pelo número {agency_cfg.phone if agency_cfg and agency_cfg.phone else '(31) 98421-0000'} para tirar dúvidas sobre vistos, roteiros personalizados e emissão de passagens."
             )
@@ -199,7 +200,7 @@ class ChatService:
             ]
         elif any(k in lower for k in ["cancel", "reembolso", "voucher", "reserva"]):
             reply = (
-                "🛡️ **Segurança e Flexibilidade Zarpou:**\n\n"
+                "🛡️ **Segurança e Flexibilidade Fly Promo:**\n\n"
                 "• **Cancelamento:** Grande parte das nossas tarifas de hotéis contam com cancelamento 100% grátis até 48h antes do check-in.\n"
                 "• **Vouchers:** São gerados automaticamente após a aprovação do pagamento e disponibilizados na aba **Minhas Viagens** e enviados por e-mail e WhatsApp.\n"
                 "• **Segurança:** Todas as transações são protegidas por criptografia SSL 256-bit e em total conformidade com a LGPD."
@@ -211,7 +212,7 @@ class ChatService:
         else:
             reply = (
                 "Olá! ✈️ Que bom conversar com você!\n\n"
-                "Como seu **Concierge Virtual Zarpou**, posso te ajudar a planejar a viagem perfeita:\n\n"
+                "Como seu **Concierge Virtual Fly Promo**, posso te ajudar a planejar a viagem perfeita:\n\n"
                 "• 🏨 **Encontrar hotéis e resorts** com as melhores avaliações.\n"
                 "• ✈️ **Cotar passagens aéreas** nacionais e internacionais com taxas inclusas.\n"
                 "• 🌴 **Montar pacotes completos** com aéreo + hotel em até 12x sem juros.\n"

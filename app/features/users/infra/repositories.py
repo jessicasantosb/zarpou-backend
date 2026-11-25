@@ -10,8 +10,11 @@ class SqlAlchemyUserRepository:
     def get_all(self) -> List[User]:
         return self.db.query(User).order_by(User.created_at.desc()).all()
 
-    def get_by_id(self, user_id: str) -> Optional[User]:
-        return self.db.query(User).filter(User.id == user_id).first()
+    def get_by_id(self, user_id: str, *, for_update: bool = False) -> Optional[User]:
+        query = self.db.query(User).filter(User.id == user_id)
+        if for_update:
+            query = query.populate_existing().with_for_update()
+        return query.first()
 
     def get_by_email(self, email: str) -> Optional[User]:
         return self.db.query(User).filter(User.email == email.strip().lower()).first()

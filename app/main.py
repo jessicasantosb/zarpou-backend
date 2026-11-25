@@ -5,6 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy import inspect, text
+from sqlalchemy.engine import Connection
 
 from app.core.config import settings
 from app.core.database import Base, engine
@@ -16,6 +18,14 @@ from app.core.limiter import limiter
 _STARTUP_COLUMN_MIGRATIONS = {
     "users": {
         "allowed_screens": "TEXT DEFAULT '[]'",
+        "session_version": "INTEGER NOT NULL DEFAULT 0",
+        "two_factor_enabled": "BOOLEAN NOT NULL DEFAULT FALSE",
+        "two_factor_method": "VARCHAR(20) DEFAULT 'email'",
+        "two_factor_secret": "VARCHAR(255)",
+        "two_factor_backup_codes": "TEXT",
+    },
+    "admin_password_reset_tokens": {
+        "session_version": "INTEGER NOT NULL DEFAULT -1",
     },
     "customers": {
         "accepted_privacy_policy": "BOOLEAN NOT NULL DEFAULT FALSE",
@@ -35,38 +45,58 @@ _STARTUP_COLUMN_MIGRATIONS = {
 }
 
 
-def _apply_column_migrations() -> None:
+def _apply_column_migrations(conn: Connection | None = None) -> None:
     """Adiciona colunas novas em tabelas já existentes (create_all não altera tabelas)."""
-    from sqlalchemy import inspect, text
+    if conn is None:
+        with engine.begin() as connection:
+            _apply_column_migrations(connection)
+        return
 
-    inspector = inspect(engine)
+    inspector = inspect(conn)
     existing_tables = set(inspector.get_table_names())
-    with engine.begin() as conn:
-        for table, columns in _STARTUP_COLUMN_MIGRATIONS.items():
-            if table not in existing_tables:
-                continue
-            current = {c["name"] for c in inspector.get_columns(table)}
-            for column, ddl in columns.items():
-                if column not in current:
-                    if engine.dialect.name == "sqlite":
-                        ddl = ddl.replace("TIMESTAMP WITH TIME ZONE", "DATETIME")
-                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
+    for table, columns in _STARTUP_COLUMN_MIGRATIONS.items():
+        if table not in existing_tables:
+            continue
+        current = {c["name"] for c in inspector.get_columns(table)}
+        for column, ddl in columns.items():
+            if column not in current:
+                if conn.dialect.name == "sqlite":
+                    ddl = ddl.replace("TIMESTAMP WITH TIME ZONE", "DATETIME")
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
 
-        # Migração de tipo: o segredo TOTP dos administradores passou a ser cifrado
-        # em repouso (Fernet, prefixo 'enc:'), que ocupa mais que o VARCHAR(64)
-        # original. No SQLite a largura não é aplicada (affinity) — só o Postgres
-        # precisa do ALTER (idempotente: só roda enquanto o tipo ainda for 64).
-        if "users" in existing_tables and engine.dialect.name == "postgresql":
-            user_cols = {c["name"]: str(c["type"]) for c in inspector.get_columns("users")}
-            if "64" in user_cols.get("two_factor_secret", ""):
-                conn.execute(text("ALTER TABLE users ALTER COLUMN two_factor_secret TYPE VARCHAR(255)"))
+    # As chaves TOTP cifradas excedem o limite antigo de 64 caracteres.
+    if "users" in existing_tables and conn.dialect.name == "postgresql":
+        user_cols = {c["name"]: str(c["type"]) for c in inspector.get_columns("users")}
+        if "64" in user_cols.get("two_factor_secret", ""):
+            conn.execute(text("ALTER TABLE users ALTER COLUMN two_factor_secret TYPE VARCHAR(255)"))
+
+
+def prepare_database_schema() -> None:
+    with engine.begin() as conn:
+        if conn.dialect.name == "postgresql":
+            conn.execute(text("SELECT pg_advisory_xact_lock(715608234)"))
+        Base.metadata.create_all(bind=conn)
+        _apply_column_migrations(conn)
+        if conn.dialect.name == "postgresql":
+            # Supabase can grant Data API roles access to newly created tables.
+            tables = (
+                "users, admin_login_challenges, admin_password_reset_tokens, "
+                "location_countries, location_states, location_cities"
+            )
+            for table in tables.split(", "):
+                conn.execute(text(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY"))
+            conn.execute(text(f"REVOKE ALL ON TABLE {tables} FROM PUBLIC"))
+            roles = conn.execute(text(
+                "SELECT rolname FROM pg_roles WHERE rolname IN ('anon', 'authenticated')"
+            )).scalars()
+            for role in roles:
+                conn.execute(text(f"REVOKE ALL ON TABLE {tables} FROM {role}"))
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Inicialização: criar tabelas e migrações estruturais necessárias
-    Base.metadata.create_all(bind=engine)
-    _apply_column_migrations()
+    if settings.SCHEMA_MIGRATIONS_ON_STARTUP:
+        prepare_database_schema()
 
     # Jobs de importação órfãos (servidor reiniciou no meio de uma carga)
     from app.core.database import SessionLocal
@@ -83,7 +113,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="API RESTful de alta performance para a Zarpou Viagens e Turismo. "
+    description="API RESTful de alta performance para a Fly Promo. "
                 "Gerenciamento de hotéis, passagens aéreas, pacotes, reservas com emissão de PNR, "
                 "checkout transparente, consultoria e concierge com IA.",
     docs_url="/docs",

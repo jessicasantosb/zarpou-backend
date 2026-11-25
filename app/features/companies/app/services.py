@@ -128,7 +128,7 @@ class CompanyService:
         if company.status == "bloqueada":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Conta corporativa suspensa ou bloqueada. Entre em contato com a Zarpou."
+                detail="Conta corporativa suspensa ou bloqueada. Entre em contato com a Fly Promo."
             )
 
         access_token = create_access_token(subject=company.id, role="company")

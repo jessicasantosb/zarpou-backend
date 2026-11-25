@@ -58,7 +58,7 @@ def _register_customer(suffix: str, password: str = "SenhaOrigem123") -> dict:
 def test_forgot_unknown_email_returns_generic_message_and_sends_no_email(
     captured_reset_urls,
 ):
-    res = client.post(FORGOT_URL, json={"email": "naoexiste.zarpou@exemplo.com"})
+    res = client.post(FORGOT_URL, json={"email": "naoexiste.flypromo@exemplo.com"})
     assert res.status_code == 200
     body = res.json()
     assert body["success"] is True

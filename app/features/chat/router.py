@@ -32,6 +32,6 @@ async def chat_concierge(
     db: Session = Depends(get_db),
     customer: Customer = Depends(get_optional_customer_user),
 ) -> Any:
-    """Concierge Virtual da Zarpou Viagens e Turismo."""
+    """Concierge Virtual da Fly Promo."""
     service = ChatService(db)
     return await service.chat(req, customer.id if customer else None)

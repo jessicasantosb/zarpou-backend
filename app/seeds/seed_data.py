@@ -1,6 +1,7 @@
 import json
 from datetime import date
 from sqlalchemy.orm import Session
+from app.core.config import settings
 from app.core.database import SessionLocal, Base, engine
 from app.core.security import get_password_hash
 from app.models.user import User
@@ -15,6 +16,8 @@ from app.models.company import Company, CompanyEmployee, CompanyInvoice
 
 
 def run_seeds(db: Session = None):
+    if settings.ENVIRONMENT.strip().lower() == "production":
+        raise RuntimeError("Dados de demonstração só podem ser carregados fora da produção.")
     close_db = False
     if db is None:
         Base.metadata.create_all(bind=engine)
@@ -23,7 +26,7 @@ def run_seeds(db: Session = None):
 
     try:
         # 1. Usuários Administradores & Equipe
-        admin_email = "admin@zarpou.com.br"
+        admin_email = "admin@example.com"
         all_screens_json = json.dumps([
             "dashboard", "hero", "promocoes", "hospedagens", "passagens",
             "destinos", "reservas", "usuarios", "administradores", "configuracoes"
@@ -32,7 +35,7 @@ def run_seeds(db: Session = None):
         if not admin_user:
             admin = User(
                 id="adm-1",
-                name="Administrador Zarpou",
+                name="Administrador Fly Promo",
                 email=admin_email,
                 password_hash=get_password_hash("admin123"),
                 role="admin",
@@ -43,7 +46,7 @@ def run_seeds(db: Session = None):
         elif not admin_user.allowed_screens:
             admin_user.allowed_screens = all_screens_json
 
-        juliana = db.query(User).filter((User.id == "adm-2") | (User.email == "juliana.costa@zarpou.com.br")).first()
+        juliana = db.query(User).filter((User.id == "adm-2") | (User.email == "juliana.costa@example.com")).first()
         gestor_screens_json = json.dumps([
             "dashboard", "hero", "promocoes", "hospedagens", "passagens", "destinos", "reservas"
         ])
@@ -51,7 +54,7 @@ def run_seeds(db: Session = None):
             db.add(User(
                 id="adm-2",
                 name="Juliana Costa",
-                email="juliana.costa@zarpou.com.br",
+                email="juliana.costa@example.com",
                 password_hash=get_password_hash("admin123"),
                 role="gestor",
                 allowed_screens=gestor_screens_json,
@@ -60,7 +63,7 @@ def run_seeds(db: Session = None):
         elif not juliana.allowed_screens:
             juliana.allowed_screens = gestor_screens_json
 
-        rodrigo = db.query(User).filter((User.id == "adm-3") | (User.email == "rodrigo.silveira@zarpou.com.br")).first()
+        rodrigo = db.query(User).filter((User.id == "adm-3") | (User.email == "rodrigo.silveira@example.com")).first()
         atendente_screens_json = json.dumps([
             "dashboard", "reservas", "usuarios"
         ])
@@ -68,7 +71,7 @@ def run_seeds(db: Session = None):
             db.add(User(
                 id="adm-3",
                 name="Rodrigo Silveira",
-                email="rodrigo.silveira@zarpou.com.br",
+                email="rodrigo.silveira@example.com",
                 password_hash=get_password_hash("admin123"),
                 role="atendente",
                 allowed_screens=atendente_screens_json,
@@ -77,7 +80,7 @@ def run_seeds(db: Session = None):
         elif not rodrigo.allowed_screens:
             rodrigo.allowed_screens = atendente_screens_json
 
-        # 1.1 Empresa B2B de Demonstração (Zarpou Empresas)
+        # 1.1 Empresa B2B de Demonstração (Fly Promo Empresas)
         comp_cnpj = "12.345.678/0001-90"
         if not db.query(Company).filter(Company.cnpj == comp_cnpj).first():
             demo_company = Company(
@@ -116,12 +119,12 @@ def run_seeds(db: Session = None):
         if not db.query(AgencySetting).filter(AgencySetting.id == "default").first():
             setting = AgencySetting(
                 id="default",
-                company_name="Zarpou Viagens e Turismo Ltda",
-                trading_name="Zarpou Viagens",
+                company_name="Fly Promo",
+                trading_name="Fly Promo",
                 cnpj="55.849.201/0001-38",
                 cadastur="34.120.948/0001-90",
                 whatsapp="5531984210000",
-                email="contato@zarpou.com.br",
+                email=settings.CONTACT_EMAIL,
                 phone="(31) 3344-5500",
                 address="Av. do Contorno, 6500 - Savassi, Belo Horizonte - MG, 30110-044",
             )
@@ -210,7 +213,7 @@ def run_seeds(db: Session = None):
         addons_data = [
             {
                 "id": "addon-insurance",
-                "title": "Seguro Viagem Zarpou Proteção Total",
+                "title": "Seguro Viagem Fly Promo Proteção Total",
                 "description": "Cobertura médica hospitalar de até R$ 150.000, extravio de bagagem e cancelamento involuntário.",
                 "price": 68.0,
                 "category": "seguro",
@@ -306,7 +309,7 @@ def run_seeds(db: Session = None):
                 "original_price_per_night": 1100.0,
                 "discount_percent": 22,
                 "max_installments": 12,
-                "badges": ["Recomendado", "Oferta Zarpou"],
+                "badges": ["Recomendado", "Oferta Fly Promo"],
                 "featured": True,
                 "rooms": [
                     {

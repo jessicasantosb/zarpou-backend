@@ -14,7 +14,7 @@ def test_superadmin_has_access_to_all_screens():
     # 1. Login com admin geral
     login_res = client.post(
         "/api/v1/auth/login",
-        json={"email": "admin@zarpou.com.br", "password": "admin123"},
+        json={"email": "admin@example.com", "password": "admin123"},
     )
     assert login_res.status_code == 200
     token = login_res.json()["access_token"]
@@ -43,12 +43,12 @@ def test_restricted_operator_is_blocked_on_unauthorized_screens():
     # 1. Cria operador pelo Superadmin com permissão APENAS para 'hospedagens'
     admin_login = client.post(
         "/api/v1/auth/login",
-        json={"email": "admin@zarpou.com.br", "password": "admin123"},
+        json={"email": "admin@example.com", "password": "admin123"},
     )
     admin_token = admin_login.json()["access_token"]
     admin_headers = {"Authorization": f"Bearer {admin_token}"}
 
-    email_op = f"operador.hotel.{int(time.time())}@zarpou.com.br"
+    email_op = f"operador.hotel.{int(time.time())}@example.com"
     create_res = client.post(
         "/api/v1/users",
         headers=admin_headers,

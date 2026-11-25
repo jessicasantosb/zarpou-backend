@@ -30,7 +30,7 @@ def test_idor_protection_on_bookings():
 def test_token_revocation_and_logout():
     """Valida revogação imediata de token no logout (OWASP A07)."""
     # 1. Login admin
-    login_res = client.post("/api/v1/auth/login", json={"email": "admin@zarpou.com.br", "password": "admin123"})
+    login_res = client.post("/api/v1/auth/login", json={"email": "admin@example.com", "password": "admin123"})
     assert login_res.status_code == 200
     token = login_res.json()["access_token"]
     refresh_token = login_res.json()["refresh_token"]
@@ -106,7 +106,7 @@ def test_lgpd_consent_export_and_anonymization():
     assert export_res.status_code == 200
     export_data = export_res.json()
     assert export_data["profile"]["email"] == email
-    assert export_data["controller"]["name"] == "Zarpou Viagens e Turismo Ltda"
+    assert export_data["controller"]["name"] == "Fly Promo"
 
     # 6. Anonimizar/Excluir conta (Direito ao Esquecimento)
     del_res = client.request(

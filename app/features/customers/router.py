@@ -30,7 +30,7 @@ def list_customers(
     current_user = Depends(require_screen("usuarios")),
 ) -> Any:
     """
-    Lista todos os usuários / clientes viajantes da Zarpou.
+    Lista todos os usuários / clientes viajantes da Fly Promo.
     Acesso restrito a administradores com permissão de tela 'usuarios'.
     """
     service = CustomerService(db)
@@ -72,7 +72,7 @@ def export_my_data(
     data = service.export_personal_data(customer)
     return JSONResponse(
         content=jsonable_encoder(data),
-        headers={"Content-Disposition": f'attachment; filename="zarpou-meus-dados-{customer.id}.json"'},
+        headers={"Content-Disposition": f'attachment; filename="fly-promo-meus-dados-{customer.id}.json"'},
     )
 
 

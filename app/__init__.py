@@ -1,4 +1,4 @@
 """
-Zarpou Viagens & Turismo Backend
+Fly Promo Backend
 """
 __version__ = "1.0.0"

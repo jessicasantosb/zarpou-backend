@@ -7,4 +7,5 @@ limiter = Limiter(
     key_func=get_remote_address,
     default_limits=["200/minute"],
     enabled=settings.RATE_LIMIT_ENABLED,
+    storage_uri=settings.RATE_LIMIT_STORAGE_URI or None,
 )

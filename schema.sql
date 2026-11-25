@@ -1,5 +1,5 @@
 -- ==============================================================================
--- MODELAGEM DE DADOS ZARPOU VIAGENS E TURISMO
+-- MODELAGEM DE DADOS Fly Promo
 -- Sistema Completo de Agência de Viagens (Hotéis, Passagens, Pacotes, Reservas, B2B e CMS)
 -- Compatível com PostgreSQL, MySQL e SQLite (tipos ANSI SQL padrão)
 -- ==============================================================================
@@ -15,6 +15,11 @@ CREATE TABLE IF NOT EXISTS users (
     role VARCHAR(50) NOT NULL DEFAULT 'admin', -- 'admin' (acesso total) ou 'personalizado' (definido por allowed_screens)
     allowed_screens TEXT DEFAULT '[]', -- JSON serializado com os IDs das telas autorizadas (ex: ["dashboard", "reservas"])
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    session_version INTEGER NOT NULL DEFAULT 0,
+    two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    two_factor_method VARCHAR(20) DEFAULT 'email',
+    two_factor_secret VARCHAR(255),
+    two_factor_backup_codes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -59,7 +64,7 @@ CREATE INDEX IF NOT EXISTS idx_customers_promo_email ON customers(notification_e
 CREATE INDEX IF NOT EXISTS idx_customers_promo_wa ON customers(notification_whatsapp_promotions);
 
 -- ------------------------------------------------------------------------------
--- 3. TABELA DE EMPRESAS CONVENIADAS (Zarpou Empresas - B2B Corporativo)
+-- 3. TABELA DE EMPRESAS CONVENIADAS (Fly Promo Empresas - B2B Corporativo)
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS companies (
     id VARCHAR(50) PRIMARY KEY,
@@ -336,7 +341,7 @@ CREATE INDEX IF NOT EXISTS idx_promotions_active ON promotions(active, display_o
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS coupons (
     id VARCHAR(50) PRIMARY KEY,
-    code VARCHAR(50) NOT NULL UNIQUE, -- ex: 'ZARPOU10'
+    code VARCHAR(50) NOT NULL UNIQUE, -- ex: 'FLYPROMO10'
     description TEXT,
     discount_type VARCHAR(20) NOT NULL DEFAULT 'percent', -- 'percent' | 'fixed'
     discount_value NUMERIC(10, 2) NOT NULL, -- % ou valor em R$
@@ -528,16 +533,16 @@ CREATE INDEX IF NOT EXISTS idx_inquiries_status ON contact_inquiries(status);
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS agency_settings (
     id VARCHAR(50) PRIMARY KEY DEFAULT 'default',
-    company_name VARCHAR(255) NOT NULL DEFAULT 'Zarpou Viagens e Turismo Ltda',
-    trading_name VARCHAR(255) NOT NULL DEFAULT 'Zarpou Viagens',
+    company_name VARCHAR(255) NOT NULL DEFAULT 'Fly Promo',
+    trading_name VARCHAR(255) NOT NULL DEFAULT 'Fly Promo',
     cnpj VARCHAR(30) NOT NULL DEFAULT '55.849.201/0001-38',
     cadastur VARCHAR(30) NOT NULL DEFAULT '34.120.948/0001-90',
     whatsapp VARCHAR(30) NOT NULL DEFAULT '5531984210000',
-    whatsapp_message TEXT DEFAULT 'Olá! Gostaria de falar com um especialista da Zarpou Viagens.',
-    email VARCHAR(255) NOT NULL DEFAULT 'contato@zarpou.com.br',
+    whatsapp_message TEXT DEFAULT 'Olá! Gostaria de falar com um especialista da Fly Promo.',
+    email VARCHAR(255) NOT NULL DEFAULT '',
     phone VARCHAR(30) NOT NULL DEFAULT '(31) 3344-5500',
-    instagram VARCHAR(255) DEFAULT 'https://instagram.com/zarpouviagens',
-    linkedin VARCHAR(255) DEFAULT 'https://linkedin.com/company/zarpouviagens',
+    instagram VARCHAR(255),
+    linkedin VARCHAR(255),
     address TEXT DEFAULT 'Av. do Contorno, 6500 - Savassi, Belo Horizonte - MG, 30110-044',
     terms_and_conditions TEXT,
     privacy_policy TEXT,
@@ -561,8 +566,8 @@ CREATE TABLE IF NOT EXISTS agency_settings (
     ai_chat_provider VARCHAR(50) NOT NULL DEFAULT 'openai',
     ai_chat_api_key TEXT,
     ai_chat_model VARCHAR(100) DEFAULT 'gpt-4o-mini',
-    ai_chat_system_prompt TEXT DEFAULT 'Você é o Concierge Virtual da Zarpou Viagens e Turismo. Atenda com calor humano, sofisticação e objetividade.',
-    ai_chat_welcome_message TEXT DEFAULT 'Olá! Sou o Concierge Virtual da Zarpou Viagens. Como posso ajudar com sua próxima viagem hoje?',
+    ai_chat_system_prompt TEXT DEFAULT 'Você é o Concierge Virtual da Fly Promo. Atenda com calor humano, sofisticação e objetividade.',
+    ai_chat_welcome_message TEXT DEFAULT 'Olá! Sou o Concierge Virtual da Fly Promo. Como posso ajudar com sua próxima viagem hoje?',
     storage_provider VARCHAR(50) NOT NULL DEFAULT 'aws_s3',
     storage_enabled BOOLEAN NOT NULL DEFAULT TRUE,
     storage_bucket_name VARCHAR(255) DEFAULT '',
@@ -591,42 +596,10 @@ CREATE INDEX IF NOT EXISTS idx_chat_session ON chat_logs(session_id);
 
 
 -- ==============================================================================
--- CARGA INICIAL DE DADOS (SEEDS DO FRONTEND ZARPOU)
+-- CARGA INICIAL DE DADOS (SEEDS DO FRONTEND Fly Promo)
 -- ==============================================================================
 
--- 1. Usuários Administradores & Equipe (senha: admin123)
-INSERT INTO users (id, name, email, password_hash, role, allowed_screens, is_active)
-VALUES 
-(
-    'adm-1',
-    'Administrador Zarpou',
-    'admin@zarpou.com.br',
-    '$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW',
-    'admin',
-    '["dashboard","hero","promocoes","hospedagens","passagens","destinos","reservas","usuarios","administradores","configuracoes"]',
-    TRUE
-),
-(
-    'adm-2',
-    'Juliana Costa',
-    'juliana.costa@zarpou.com.br',
-    '$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW',
-    'personalizado',
-    '["dashboard","hero","promocoes","hospedagens","passagens","destinos","reservas"]',
-    TRUE
-),
-(
-    'adm-3',
-    'Rodrigo Silveira',
-    'rodrigo.silveira@zarpou.com.br',
-    '$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW',
-    'personalizado',
-    '["dashboard","reservas","usuarios"]',
-    TRUE
-)
-ON CONFLICT (email) DO NOTHING;
-
--- 2. Empresa Conveniada de Demonstração (Zarpou Empresas)
+-- 2. Empresa Conveniada de Demonstração (Fly Promo Empresas)
 INSERT INTO companies (
     id, cnpj, razao_social, nome_fantasia, corporate_email, phone, manager_name, manager_cpf, password_hash, status, corporate_discount_percent, credit_limit, credit_used, payment_terms
 ) VALUES (
@@ -667,12 +640,12 @@ INSERT INTO agency_settings (
     storage_provider, storage_enabled, storage_bucket_name, storage_region
 ) VALUES (
     'default',
-    'Zarpou Viagens e Turismo Ltda',
-    'Zarpou Viagens',
+    'Fly Promo',
+    'Fly Promo',
     '55.849.201/0001-38',
     '34.120.948/0001-90',
     '5531984210000',
-    'contato@zarpou.com.br',
+    '',
     '(31) 3344-5500',
     'Av. do Contorno, 6500 - Savassi, Belo Horizonte - MG, 30110-044',
     'aws_s3',
@@ -693,7 +666,7 @@ ON CONFLICT (id) DO NOTHING;
 -- 6. Adicionais de Reserva (Addons)
 INSERT INTO addons (id, title, description, price, category, is_active)
 VALUES
-('addon-insurance', 'Seguro Viagem Zarpou Proteção Total', 'Cobertura médica hospitalar de até R$ 150.000, extravio de bagagem e cancelamento involuntário.', 68.00, 'seguro', TRUE),
+('addon-insurance', 'Seguro Viagem Fly Promo Proteção Total', 'Cobertura médica hospitalar de até R$ 150.000, extravio de bagagem e cancelamento involuntário.', 68.00, 'seguro', TRUE),
 ('addon-baggage', 'Bagagem Despachada Extra 23kg', 'Garanta espaço extra para suas compras e lembranças de viagem com tarifa promocional.', 110.00, 'bagagem', TRUE),
 ('addon-transfer', 'Transfer Executivo Aeroporto / Hotel', 'Recepção privativa com motorista credenciado e veículo climatizado na chegada e partida.', 140.00, 'traslado', TRUE)
 ON CONFLICT (id) DO NOTHING;
@@ -733,4 +706,71 @@ CREATE TABLE IF NOT EXISTS customer_password_reset_tokens (
 
 CREATE INDEX IF NOT EXISTS idx_customer_password_reset_tokens_customer_id ON customer_password_reset_tokens(customer_id);
 CREATE INDEX IF NOT EXISTS idx_customer_password_reset_tokens_token_hash ON customer_password_reset_tokens(token_hash);
+
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS location_countries (
+    code VARCHAR(2) PRIMARY KEY,
+    name VARCHAR(200) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS location_states (
+    code VARCHAR(32) PRIMARY KEY,
+    country_code VARCHAR(2) NOT NULL REFERENCES location_countries(code),
+    name VARCHAR(200) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_location_states_country_code ON location_states(country_code);
+
+CREATE TABLE IF NOT EXISTS location_cities (
+    id INTEGER PRIMARY KEY,
+    country_code VARCHAR(2) NOT NULL REFERENCES location_countries(code),
+    state_code VARCHAR(32) REFERENCES location_states(code),
+    name VARCHAR(200) NOT NULL,
+    search_name VARCHAR(255) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_location_city_country_name ON location_cities(country_code, search_name, id);
+CREATE INDEX IF NOT EXISTS ix_location_city_state_name ON location_cities(state_code, search_name, id);
+
+CREATE TABLE IF NOT EXISTS admin_password_reset_tokens (
+    user_id VARCHAR(36) PRIMARY KEY,
+    email VARCHAR(255) NOT NULL,
+    session_version INTEGER NOT NULL,
+    token_hash VARCHAR(64) NOT NULL UNIQUE,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS admin_login_challenges (
+    user_id VARCHAR(36) PRIMARY KEY,
+    token_hash VARCHAR(64) NOT NULL UNIQUE,
+    credential_fingerprint VARCHAR(64) NOT NULL,
+    email_code_hash VARCHAR(64),
+    email_sent_at TIMESTAMP WITH TIME ZONE,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    attempts INTEGER NOT NULL
+);
+
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE admin_password_reset_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE admin_login_challenges ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE location_countries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE location_states ENABLE ROW LEVEL SECURITY;
+ALTER TABLE location_cities ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE users, admin_password_reset_tokens, admin_login_challenges FROM PUBLIC;
+REVOKE ALL ON TABLE location_countries, location_states, location_cities FROM PUBLIC;
+
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+        REVOKE ALL ON TABLE users, admin_password_reset_tokens, admin_login_challenges FROM anon;
+        REVOKE ALL ON TABLE location_countries, location_states, location_cities FROM anon;
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+        REVOKE ALL ON TABLE users, admin_password_reset_tokens, admin_login_challenges FROM authenticated;
+        REVOKE ALL ON TABLE location_countries, location_states, location_cities FROM authenticated;
+    END IF;
+END $$;
+
+COMMIT;
 

@@ -13,7 +13,7 @@ client = TestClient(app)
 def _admin_headers() -> dict:
     login = client.post(
         "/api/v1/auth/login",
-        json={"email": "admin@zarpou.com.br", "password": "admin123"},
+        json={"email": "admin@example.com", "password": "admin123"},
     )
     assert login.status_code == 200
     return {"Authorization": f"Bearer {login.json()['access_token']}"}

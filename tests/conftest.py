@@ -23,12 +23,12 @@ def _ensure_schema():
     # Garantir usuários de teste essenciais
     db = SessionLocal()
     try:
-        admin = db.query(User).filter(User.email == "admin@zarpou.com.br").first()
+        admin = db.query(User).filter(User.email == "admin@example.com").first()
         if not admin:
             admin = User(
                 id="adm-1",
-                name="Administrador Zarpou",
-                email="admin@zarpou.com.br",
+                name="Administrador Fly Promo",
+                email="admin@example.com",
                 password_hash=get_password_hash("admin123"),
                 role="admin",
                 allowed_screens=json.dumps(list(ALL_ADMIN_SCREENS)),
@@ -36,12 +36,12 @@ def _ensure_schema():
             )
             db.add(admin)
 
-        juliana = db.query(User).filter(User.email == "juliana.costa@zarpou.com.br").first()
+        juliana = db.query(User).filter(User.email == "juliana.costa@example.com").first()
         if not juliana:
             juliana = User(
                 id="adm-2",
                 name="Juliana Costa",
-                email="juliana.costa@zarpou.com.br",
+                email="juliana.costa@example.com",
                 password_hash=get_password_hash("admin123"),
                 role="personalizado",
                 allowed_screens=json.dumps(["dashboard", "hero", "promocoes", "hospedagens", "passagens", "destinos", "reservas"]),
@@ -59,15 +59,15 @@ def _ensure_schema():
         # Reativa contas de teste deixadas inativas por execuções anteriores:
         # um admin inativo derruba TODOS os logins da suíte (cascade de falhas).
         db.query(User).filter(User.email.in_([
-            "admin@zarpou.com.br",
-            "juliana.costa@zarpou.com.br",
+            "admin@example.com",
+            "juliana.costa@example.com",
         ])).update({User.is_active: True}, synchronize_session=False)
 
         # Garante a senha padrão da suíte: a suíte assume admin123 para os dois
         # logins de teste; regrava o hash caso a conta tenha sido alterada fora.
         for test_user in db.query(User).filter(User.email.in_([
-            "admin@zarpou.com.br",
-            "juliana.costa@zarpou.com.br",
+            "admin@example.com",
+            "juliana.costa@example.com",
         ])).all():
             if not verify_password("admin123", test_user.password_hash):
                 test_user.password_hash = get_password_hash("admin123")

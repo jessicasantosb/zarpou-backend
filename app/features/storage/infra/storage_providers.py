@@ -71,7 +71,7 @@ class S3StorageProvider:
 
 
 class SupabaseStorageProvider:
-    def __init__(self, supabase_url: str, supabase_key: str, bucket_name: str = "zarpou-media"):
+    def __init__(self, supabase_url: str, supabase_key: str, bucket_name: str):
         self.supabase_url = supabase_url
         self.supabase_key = supabase_key
         self.bucket_name = bucket_name

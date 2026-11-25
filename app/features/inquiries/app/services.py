@@ -5,6 +5,7 @@ import httpx
 from fastapi import BackgroundTasks, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.features.agency.infra.models import AgencySetting
 from app.features.inquiries.infra.models import ContactInquiry
 from app.features.inquiries.infra.repositories import ContactInquiryRepository
@@ -12,13 +13,14 @@ from app.features.inquiries.app.schemas import InquiryCreate, InquiryStatusUpdat
 
 
 async def send_inquiry_resend_notification(api_key: str, recipient_email: str, inquiry: ContactInquiry):
-    if not api_key:
+    recipient = recipient_email or settings.CONTACT_EMAIL
+    if not api_key or not settings.RESEND_FROM_EMAIL or not recipient:
         return
     try:
         html_content = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
             <h2 style="color: #002B49; border-bottom: 2px solid #F5A623; padding-bottom: 8px;">
-                Nova Solicitação de Consultoria - Zarpou Viagens
+                Nova Solicitação de Consultoria - Fly Promo
             </h2>
             <p><strong>Nome:</strong> {inquiry.name}</p>
             <p><strong>E-mail:</strong> {inquiry.email}</p>
@@ -45,8 +47,8 @@ async def send_inquiry_resend_notification(api_key: str, recipient_email: str, i
                     "Content-Type": "application/json",
                 },
                 json={
-                    "from": "Zarpou Viagens <lazer@zarpouviagens.com.br>",
-                    "to": [recipient_email or "lazer@zarpouviagens.com.br"],
+                    "from": f"Fly Promo <{settings.RESEND_FROM_EMAIL}>",
+                    "to": [recipient],
                     "subject": f"Nova Consultoria de Viagem: {inquiry.name} - {inquiry.destination}",
                     "html": html_content,
                 },

@@ -18,7 +18,7 @@ def test_admin_login_returns_refresh_token_and_can_refresh():
     # 1. Login com admin existente
     login_res = client.post(
         "/api/v1/auth/login",
-        json={"email": "admin@zarpou.com.br", "password": "admin123"},
+        json={"email": "admin@example.com", "password": "admin123"},
     )
     assert login_res.status_code == 200, login_res.text
     data = login_res.json()
@@ -42,7 +42,7 @@ def test_admin_login_returns_refresh_token_and_can_refresh():
     auth_headers = {"Authorization": f"Bearer {new_data['access_token']}"}
     me_res = client.get("/api/v1/auth/me", headers=auth_headers)
     assert me_res.status_code == 200
-    assert me_res.json()["email"] == "admin@zarpou.com.br"
+    assert me_res.json()["email"] == "admin@example.com"
 
 
 def test_customer_login_returns_refresh_token_and_can_refresh():
@@ -144,7 +144,7 @@ def test_storage_upload_validation_and_local_fallback():
 
     login_res = client.post(
         "/api/v1/auth/login",
-        json={"email": "admin@zarpou.com.br", "password": "admin123"},
+        json={"email": "admin@example.com", "password": "admin123"},
     )
     assert login_res.status_code == 200
     headers = {"Authorization": f"Bearer {login_res.json()['access_token']}"}
@@ -185,7 +185,7 @@ def test_s3_storage_provider_upload():
         access_key_id="AKIAIOSFODNN7EXAMPLE",
         secret_access_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
         region="sa-east-1",
-        public_url_prefix="https://cdn.zarpou.com.br",
+        public_url_prefix="https://cdn.example.com",
     )
 
     fake_content = b"\x89PNG\r\n\x1a\nfakecontent"
@@ -204,7 +204,7 @@ def test_s3_storage_provider_upload():
 
         assert result.success is True
         assert result.provider == "aws_s3"
-        assert result.url == "https://cdn.zarpou.com.br/destinos/foto.png"
+        assert result.url == "https://cdn.example.com/destinos/foto.png"
         assert result.size == len(fake_content)
         assert result.filename == "foto.png"
         assert result.folder == "destinos"

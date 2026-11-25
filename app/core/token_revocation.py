@@ -36,6 +36,7 @@ def is_token_revoked(
     jti: Optional[str],
     subject: Optional[str] = None,
     issued_at: Optional[int] = None,
+    issued_at_us: Optional[int] = None,
 ) -> bool:
     """
     Verifica se um token está revogado.
@@ -55,18 +56,15 @@ def is_token_revoked(
     marker = db.query(RevokedToken).filter(RevokedToken.jti == f"sub:{subject}").first()
     if marker is None:
         return False
-    if issued_at is None:
-        return True
-
-    issued = datetime.fromtimestamp(int(issued_at), tz=timezone.utc)
     revoked_at = (
         marker.revoked_at
         if marker.revoked_at.tzinfo
         else marker.revoked_at.replace(tzinfo=timezone.utc)
     )
-    # `iat` tem precisão de segundos: um token emitido no mesmo segundo do reset
-    # é considerado novo (evita 401 imediato no auto-login pós-reset).
-    return issued < revoked_at.replace(microsecond=0)
+    if issued_at_us is not None:
+        return issued_at_us <= int(revoked_at.timestamp() * 1_000_000)
+    # Legacy tokens cannot be ordered within the revocation second.
+    return issued_at is None or issued_at <= int(revoked_at.timestamp())
 
 
 def revoke_subject_tokens(db: Session, subject: str) -> None:

@@ -11,7 +11,7 @@ client = TestClient(app)
 
 def test_admin_cannot_deactivate_self():
     db = SessionLocal()
-    admin = db.query(User).filter(User.email == "admin@zarpou.com.br").first()
+    admin = db.query(User).filter(User.email == "admin@example.com").first()
     db.close()
     assert admin is not None
 
@@ -26,8 +26,8 @@ def test_admin_cannot_deactivate_self():
 
 def test_admin_can_toggle_other_admin_status():
     db = SessionLocal()
-    admin = db.query(User).filter(User.email == "admin@zarpou.com.br").first()
-    other_admin = db.query(User).filter(User.email == "juliana.costa@zarpou.com.br").first()
+    admin = db.query(User).filter(User.email == "admin@example.com").first()
+    other_admin = db.query(User).filter(User.email == "juliana.costa@example.com").first()
     db.close()
     assert admin is not None
     assert other_admin is not None
@@ -48,7 +48,7 @@ def test_admin_can_toggle_other_admin_status():
 
 def test_list_customers_and_toggle_status():
     db = SessionLocal()
-    admin = db.query(User).filter(User.email == "admin@zarpou.com.br").first()
+    admin = db.query(User).filter(User.email == "admin@example.com").first()
     db.close()
 
     token = create_access_token(subject=admin.id, role=admin.role)
@@ -77,11 +77,11 @@ def test_list_customers_and_toggle_status():
 
 def test_non_admin_cannot_access_users_endpoint():
     db = SessionLocal()
-    gestor = db.query(User).filter(User.email == "juliana.costa@zarpou.com.br").first()
+    gestor = db.query(User).filter(User.email == "juliana.costa@example.com").first()
     db.close()
     assert gestor is not None
 
-    token = create_access_token(subject=gestor.id, role=gestor.role)
+    token = create_access_token(subject=gestor.id, role=gestor.role, session_version=gestor.session_version)
     headers = {"Authorization": f"Bearer {token}"}
 
     res = client.get("/api/v1/users", headers=headers)

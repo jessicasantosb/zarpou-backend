@@ -3,9 +3,10 @@ import json
 import uuid
 from typing import List, Optional
 from fastapi import HTTPException, status
+from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 from app.core.security import get_password_hash
-from app.core.two_factor import encrypt_totp_secret
+from app.core.two_factor import encrypt_totp_secret, hash_backup_code
 from app.features.users.infra.models import User, ALL_ADMIN_SCREENS
 from app.features.users.infra.repositories import SqlAlchemyUserRepository
 from app.features.users.app.schemas import UserCreate, UserUpdate, UserStatusUpdate
@@ -42,9 +43,9 @@ class UserService:
         self.check_can_manage_admins(current_user)
         return self.repository.get_all()
 
-    def get_user_by_id(self, user_id: str, current_user: User) -> User:
+    def get_user_by_id(self, user_id: str, current_user: User, *, for_update: bool = False) -> User:
         self.check_can_manage_admins(current_user)
-        user = self.repository.get_by_id(user_id)
+        user = self.repository.get_by_id(user_id, for_update=for_update)
         if not user:
             raise HTTPException(status_code=404, detail="Administrador não encontrado.")
         # Contas de Administrador Geral só podem ser alteradas por um Administrador Geral
@@ -88,7 +89,7 @@ class UserService:
 
         backup_codes_raw = None
         if user_in.two_factor_backup_codes:
-            backup_codes_raw = json.dumps(user_in.two_factor_backup_codes)
+            backup_codes_raw = json.dumps([hash_backup_code(code) for code in user_in.two_factor_backup_codes])
 
         new_user = User(
             id=f"adm-{uuid.uuid4().hex[:8]}",
@@ -109,7 +110,7 @@ class UserService:
 
     def update_user(self, user_id: str, user_in: UserUpdate, current_user: User) -> User:
         self.check_can_manage_admins(current_user)
-        user = self.get_user_by_id(user_id, current_user)
+        user = self.get_user_by_id(user_id, current_user, for_update=True)
 
         # Um gestor não-admin não pode reconfigurar o próprio nível de acesso
         # (nem promover a si, nem auto-conceder telas de permissão).
@@ -185,7 +186,14 @@ class UserService:
             user.two_factor_secret = encrypt_totp_secret(user_in.two_factor_secret)
 
         if user_in.two_factor_backup_codes is not None:
-            user.two_factor_backup_codes = json.dumps(user_in.two_factor_backup_codes)
+            user.two_factor_backup_codes = json.dumps([hash_backup_code(code) for code in user_in.two_factor_backup_codes])
+
+        auth_fields = (
+            "email", "password_hash", "role", "is_active", "two_factor_enabled",
+            "two_factor_method", "two_factor_secret", "two_factor_backup_codes",
+        )
+        if any(inspect(user).attrs[field].history.has_changes() for field in auth_fields):
+            user.session_version += 1
 
         user.updated_at = datetime.now(timezone.utc)
         return self.repository.save(user)
@@ -197,8 +205,10 @@ class UserService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Você não pode desativar seu próprio usuário administrador."
             )
-        user = self.get_user_by_id(user_id, current_user)
-        user.is_active = status_in.is_active
+        user = self.get_user_by_id(user_id, current_user, for_update=True)
+        if user.is_active != status_in.is_active:
+            user.is_active = status_in.is_active
+            user.session_version += 1
         user.updated_at = datetime.now(timezone.utc)
         return self.repository.save(user)
 

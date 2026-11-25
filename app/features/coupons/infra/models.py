@@ -7,7 +7,7 @@ class Coupon(Base):
     __tablename__ = "coupons"
 
     id = Column(String(50), primary_key=True)  # ex: 'cpn-1'
-    code = Column(String(50), unique=True, nullable=False, index=True)  # ex: 'ZARPOU10'
+    code = Column(String(50), unique=True, nullable=False, index=True)  # ex: 'FLYPROMO10'
     description = Column(Text, nullable=True)
     discount_type = Column(String(20), nullable=False, default="percent")  # 'percent' | 'fixed'
     discount_value = Column(Numeric(10, 2), nullable=False)  # % ou valor em R$
